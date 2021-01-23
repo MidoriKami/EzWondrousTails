@@ -1,0 +1,42 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30907.101
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WondrousTailsSolver", "WondrousTailsSolver\WondrousTailsSolver.csproj", "{E4BEAAE4-8522-44B6-8754-9560475D20D3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFXIVClientStructs", "lib\FFXIVClientStructs\FFXIVClientStructs.csproj", "{3DBAEE68-9D94-4807-BCB1-E42EDD52B489}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7EDD1F8C-4647-45DA-A5AF-DEF41D07F0E2}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.gitignore = .gitignore
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github Actions", "Github Actions", "{3371BF8A-1889-4F87-91D6-C6A75BA0A73D}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build.yml = .github\workflows\build.yml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E4BEAAE4-8522-44B6-8754-9560475D20D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4BEAAE4-8522-44B6-8754-9560475D20D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4BEAAE4-8522-44B6-8754-9560475D20D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4BEAAE4-8522-44B6-8754-9560475D20D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DBAEE68-9D94-4807-BCB1-E42EDD52B489}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DBAEE68-9D94-4807-BCB1-E42EDD52B489}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DBAEE68-9D94-4807-BCB1-E42EDD52B489}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DBAEE68-9D94-4807-BCB1-E42EDD52B489}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3E6E4EE7-37C9-4F2A-9207-6804CA5194F8}
+	EndGlobalSection
+EndGlobal
