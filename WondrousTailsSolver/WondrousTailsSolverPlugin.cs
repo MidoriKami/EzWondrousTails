@@ -21,9 +21,7 @@ namespace WondrousTailsSolver
         internal DalamudPluginInterface Interface;
         internal PluginAddressResolver Address;
 
-        private Hook<AddonWeeklyBingo_Ctor_Delegate> AddonWeeklyBingo_Ctor_Hook;
         private AtkTextNode_SetText_Delegate AtkTextNode_SetText;
-        private CancellationTokenSource LoopTokenSource;
 
         private const int TotalStickers = PerfectTails.TotalStickers;
         private const int TotalLanes = PerfectTails.StickersPerLane;
@@ -35,88 +33,90 @@ namespace WondrousTailsSolver
             Address = new PluginAddressResolver();
             Address.Setup(Interface.TargetModuleScanner);
 
-            AddonWeeklyBingo_Ctor_Hook = new Hook<AddonWeeklyBingo_Ctor_Delegate>(Address.AddonWeeklyBingo_Ctor_Address, new AddonWeeklyBingo_Ctor_Delegate(AddonWeeklyBingo_Ctor_Detour), this);
             AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
 
-            AddonWeeklyBingo_Ctor_Hook.Enable();
+            QueueLoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
         }
 
         public void Dispose()
         {
             LoopTokenSource?.Cancel();
-
-            AddonWeeklyBingo_Ctor_Hook?.Disable();
-            AddonWeeklyBingo_Ctor_Hook?.Dispose();
         }
 
-        #region Hooks
+        private Task QueueLoopTask;
+        private readonly CancellationTokenSource LoopTokenSource = new CancellationTokenSource();
+        private readonly bool[] GameState = new bool[TotalStickers];
+        private string LastTextModification = "A standard default text placeholder that likely won't appear";
+        private readonly PerfectTails PerfectTails = new PerfectTails();
 
-        private IntPtr AddonWeeklyBingo_Ctor_Detour(IntPtr a1)
+        private async void GameUpdaterLoop(CancellationToken token)
         {
-            var addonPtr = AddonWeeklyBingo_Ctor_Hook.Original(a1);
-
-            for (int i = 0; i < TotalStickers; i++)
+            for (int i = 0; i < GameState.Length; i++)
                 GameState[i] = true;
 
-            LoopTokenSource?.Cancel();
-            LoopTokenSource = new CancellationTokenSource();
-            Task.Run(() => UpdateTextLoop(addonPtr, LoopTokenSource.Token));
-            return addonPtr;
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(100);
+                GameUpdater(token);
+            }
         }
 
-        private unsafe void UpdateTextLoop(IntPtr addonPtr, CancellationToken token)
+        private unsafe void GameUpdater(CancellationToken token)
         {
+            var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyBingo", 1);
             if (addonPtr == IntPtr.Zero)
                 return;
 
             var addon = (AddonWeeklyBingo*)addonPtr;
-
             if (addon == null)
                 return;
 
-            while (!token.IsCancellationRequested && addon->AtkUnitBase.IsVisible)
+            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.ULDData.LoadedState != 3 || addon->AtkUnitBase.ULDData.NodeListCount < 96)
+                return;
+
+            var textNode = (AtkTextNode*)addon->AtkUnitBase.ULDData.NodeList[96];
+            if (textNode == null)
+                return;
+
+            var stateChanged = UpdateGameState(addon);
+            var currentText = Marshal.PtrToStringAnsi(new IntPtr(textNode->NodeText.StringPtr));
+
+            if (stateChanged)
+                UpdateTextModification();
+
+            if (!currentText.Contains("1 Line") && !currentText.Contains("2 Lines") && !currentText.Contains("3 lines"))
             {
-                if (addon->AtkUnitBase.ULDData.LoadedState == 3 && addon->AtkUnitBase.ULDData.NodeListCount >= 96)
-                {
-                    var textNode = (AtkTextNode*)addon->AtkUnitBase.ULDData.NodeList[96];
-                    if (textNode != null)
-                    {
-                        UpdateText(addon, textNode);
-                    }
-                }
-                Task.Delay(100).Wait();
+                var textNodePtr = new IntPtr(textNode);
+                var textPtr = Marshal.StringToHGlobalAnsi($"{currentText}\n{LastTextModification}");
+                AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
+                Marshal.FreeHGlobal(textPtr);
             }
         }
-
-        private readonly bool[] GameState = new bool[TotalStickers];
-
-        private unsafe void UpdateText(AddonWeeklyBingo* addon, AtkTextNode* textNode)
+        private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
         {
             bool stateChanged = false;
             for (var i = 0; i < TotalStickers; i++)
             {
                 var node = addon->StickerSlotList[i].StickerComponentBase;
                 if (node == null)
-                    return;
+                    return false;
 
                 var parentNode = node->OwnerNode->AtkResNode.ParentNode;
                 var state = parentNode->IsVisible;
                 stateChanged |= GameState[i] != state;
                 GameState[i] = state;
             }
+            return stateChanged;
+        }
 
-            if (!stateChanged)
-                return;
-
+        private void UpdateTextModification()
+        {
             var stickersPlaced = GameState.Count(s => s);
             if (stickersPlaced == 9)
                 return;
 
-            var currentText = Marshal.PtrToStringAnsi(new IntPtr(textNode->NodeText.StringPtr));
-
             var sb = new StringBuilder();
             var probs = PerfectTails.Solve(GameState);
-            sb.AppendLine(currentText);
             sb.AppendLine($"1 Line: {probs[0] * 100:F2}%");
             sb.AppendLine($"2 Lines: {probs[1] * 100:F2}%");
             sb.AppendLine($"3 Lines: {probs[2] * 100:F2}%");
@@ -129,15 +129,7 @@ namespace WondrousTailsSolver
                 sb.Append($"{sample[1] * 100:F2}%   ");
                 sb.Append($"{sample[2] * 100:F2}%   ");
             }
-
-            var textNodePtr = new IntPtr(textNode);
-            var textPtr = Marshal.StringToHGlobalAnsi(sb.ToString());
-            AtkTextNode_SetText(new IntPtr(textNode), textPtr, IntPtr.Zero);
-            Marshal.FreeHGlobal(textPtr);
+            LastTextModification = sb.ToString();
         }
-
-        #endregion
-
-        private readonly PerfectTails PerfectTails = new PerfectTails();
     }
 }
