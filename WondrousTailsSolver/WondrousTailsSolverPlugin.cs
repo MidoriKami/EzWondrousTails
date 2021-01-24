@@ -33,11 +33,20 @@ namespace WondrousTailsSolver
 
             QueueLoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
 
-            Interface.ClientState.OnLogin += (sender, e) => Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
+            Interface.ClientState.OnLogin += UserWarning;
+            if (Interface.ClientState.LocalPlayer != null)
+                UserWarning(null, null);
+        }
+
+        private void UserWarning(object sender, EventArgs args)
+        {
+            Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
         }
 
         public void Dispose()
         {
+            Interface.ClientState.OnLogin -= UserWarning;
+
             LoopTokenSource?.Cancel();
         }
 
