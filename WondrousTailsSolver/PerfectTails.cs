@@ -21,12 +21,18 @@ namespace WondrousTailsSolver
         public double[] Solve(bool[] cells)
         {
             var mask = CellsToMask(cells);
-            var counts = PossibleBoards[mask];
 
-            var divisor = (double)counts[0];
-            var probs = counts.Skip(1).Select(c => Math.Round(c / divisor, 4)).ToArray();
+            if (PossibleBoards.TryGetValue(mask, out var counts))
+            {
+                var divisor = (double)counts[0];
+                var probs = counts.Skip(1).Select(c => Math.Round(c / divisor, 4)).ToArray();
 
-            return probs;
+                return probs;
+            }
+            else
+            {
+                return new double[] { -1, -1, -1 };
+            }
         }
 
         public double[] GetSample(int stickersPlaced)
@@ -41,6 +47,11 @@ namespace WondrousTailsSolver
             if (PossibleBoards.TryGetValue(mask, out var result))
                 return result;
 
+            if (numStickers > 9)
+            {
+                return new long[] { 0, 0, 0, 0 };
+            }
+
             if (numStickers == 9)
             {
                 var lines = numRows + numCols + numDiags;
@@ -50,11 +61,6 @@ namespace WondrousTailsSolver
                     lines >= 2 ? 1 : 0,
                     lines >= 3 ? 1 : 0
                 };
-            }
-
-            if (numStickers > 9)
-            {
-                return new long[] { 0, 0, 0, 0 };
             }
 
             result = PossibleBoards[mask] = new long[] { 0, 0, 0, 0 };

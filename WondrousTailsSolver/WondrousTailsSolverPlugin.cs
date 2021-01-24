@@ -1,15 +1,11 @@
 ﻿using Dalamud.Plugin;
-using ImGuiNET;
 using System;
 using System.Linq;
-using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using System.Threading.Tasks;
 using System.Threading;
-using Dalamud.Hooking;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
 using System.Text;
 
 namespace WondrousTailsSolver
@@ -36,6 +32,8 @@ namespace WondrousTailsSolver
             AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
 
             QueueLoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
+
+            Interface.ClientState.OnLogin += (sender, e) => Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
         }
 
         public void Dispose()
@@ -54,10 +52,18 @@ namespace WondrousTailsSolver
             for (int i = 0; i < GameState.Length; i++)
                 GameState[i] = true;
 
-            while (!token.IsCancellationRequested)
+            try
             {
-                await Task.Delay(100);
-                GameUpdater(token);
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(100);
+                    GameUpdater(token);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception)
+            {
+                Interface.Framework.Gui.Chat.PrintError($"{Name} has encountered a critical error");
             }
         }
 
@@ -81,28 +87,37 @@ namespace WondrousTailsSolver
             var stateChanged = UpdateGameState(addon);
             var currentText = Marshal.PtrToStringAnsi(new IntPtr(textNode->NodeText.StringPtr));
 
-            if (stateChanged)
+            var newlines = currentText.Split('').Length - 1;  // SQEx newline contraption
+            if ((stateChanged || !currentText.Contains("1 Line")) && newlines < 2)
+            {
                 UpdateTextModification();
 
-            if (!currentText.Contains("1 Line") && !currentText.Contains("2 Lines") && !currentText.Contains("3 lines"))
-            {
+                var modIdx = currentText.IndexOf("1 Line");
+                if (modIdx >= 0)
+                {
+                    currentText = currentText.Substring(0, modIdx) + LastTextModification;
+                }
+                else
+                {
+                    currentText = currentText + "\n" + LastTextModification;
+                }
                 var textNodePtr = new IntPtr(textNode);
                 var textPtr = Marshal.StringToHGlobalAnsi($"{currentText}\n{LastTextModification}");
                 AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
                 Marshal.FreeHGlobal(textPtr);
             }
         }
+
         private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
         {
             bool stateChanged = false;
             for (var i = 0; i < TotalStickers; i++)
             {
-                var node = addon->StickerSlotList[i].StickerComponentBase;
+                var node = addon->StickerSlotList[i].StickerComponentBase->OwnerNode->AtkResNode.ParentNode;
                 if (node == null)
                     return false;
 
-                var parentNode = node->OwnerNode->AtkResNode.ParentNode;
-                var state = parentNode->IsVisible;
+                var state = node->IsVisible;
                 stateChanged |= GameState[i] != state;
                 GameState[i] = state;
             }
@@ -117,6 +132,14 @@ namespace WondrousTailsSolver
 
             var sb = new StringBuilder();
             var probs = PerfectTails.Solve(GameState);
+            if (probs == new double[] { -1, -1, -1 })
+            {
+                var stateStr = "[" + string.Join(" ", GameState) + "]";
+                PluginLog.Error($"{Name} failed to solve for {stateStr}");
+                Interface.Framework.Gui.Chat.PrintError($"{Name} failed to solve the given game board");
+                return;
+            }
+
             sb.AppendLine($"1 Line: {probs[0] * 100:F2}%");
             sb.AppendLine($"2 Lines: {probs[1] * 100:F2}%");
             sb.AppendLine($"3 Lines: {probs[2] * 100:F2}%");
