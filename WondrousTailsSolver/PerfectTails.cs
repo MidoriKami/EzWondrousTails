@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -87,7 +87,7 @@ namespace WondrousTailsSolver
                     var nRows = MaskHasRow(nMask, r) ? 1 : 0;
                     var nCols = MaskHasCol(nMask, c) ? 1 : 0;
                     var nDiag1 = MaskHasDiag1(nMask) && r == c ? 1 : 0;
-                    var nDiag2 = MaskHasDiag2(nMask) && r == c - 3 ? 1 : 0;
+                    var nDiag2 = MaskHasDiag2(nMask) && r == 3 - c ? 1 : 0;
                     var nResult = CalculateBoards(nMask, numStickers + 1, numRows + nRows, numCols + nCols, numDiags + nDiag1 + nDiag2);
 
                     for (var i = 0; i < 4; i++)
