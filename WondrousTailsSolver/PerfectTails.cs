@@ -6,9 +6,6 @@ namespace WondrousTailsSolver
 {
     public sealed class PerfectTails
     {
-        public const int TotalStickers = 16;
-        public const int StickersPerLane = 4;
-
         private readonly Dictionary<int, long[]> PossibleBoards = new Dictionary<int, long[]>();
         private readonly Dictionary<int, double[]> SampleProbs = new Dictionary<int, double[]>();
 
@@ -16,6 +13,20 @@ namespace WondrousTailsSolver
         {
             CalculateBoards(0, 0, 0, 0, 0);
             CalculateSamples();
+        }
+
+        public long[] GetValues(bool[] cells)
+        {
+            var mask = CellsToMask(cells);
+
+            if (PossibleBoards.TryGetValue(mask, out var counts))
+            {
+                return counts;
+            }
+            else
+            {
+                return new long[] { -1, -1, -1, -1 };
+            }
         }
 
         public double[] Solve(bool[] cells)
@@ -47,11 +58,6 @@ namespace WondrousTailsSolver
             if (PossibleBoards.TryGetValue(mask, out var result))
                 return result;
 
-            if (numStickers > 9)
-            {
-                return new long[] { 0, 0, 0, 0 };
-            }
-
             if (numStickers == 9)
             {
                 var lines = numRows + numCols + numDiags;
@@ -61,6 +67,11 @@ namespace WondrousTailsSolver
                     lines >= 2 ? 1 : 0,
                     lines >= 3 ? 1 : 0
                 };
+            }
+
+            if (numStickers > 9)
+            {
+                return new long[] { 0, 0, 0, 0 };
             }
 
             result = PossibleBoards[mask] = new long[] { 0, 0, 0, 0 };
@@ -75,8 +86,8 @@ namespace WondrousTailsSolver
                     var nMask = SetMaskBit(mask, r, c);
                     var nRows = MaskHasRow(nMask, r) ? 1 : 0;
                     var nCols = MaskHasCol(nMask, c) ? 1 : 0;
-                    var nDiag1 = MaskHasDiag1(nMask) ? 1 : 0;
-                    var nDiag2 = MaskHasDiag2(nMask) ? 1 : 0;
+                    var nDiag1 = MaskHasDiag1(nMask) && r == c ? 1 : 0;
+                    var nDiag2 = MaskHasDiag2(nMask) && r == c - 3 ? 1 : 0;
                     var nResult = CalculateBoards(nMask, numStickers + 1, numRows + nRows, numCols + nCols, numDiags + nDiag1 + nDiag2);
 
                     for (var i = 0; i < 4; i++)

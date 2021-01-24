@@ -19,9 +19,6 @@ namespace WondrousTailsSolver
 
         private AtkTextNode_SetText_Delegate AtkTextNode_SetText;
 
-        private const int TotalStickers = PerfectTails.TotalStickers;
-        private const int TotalLanes = PerfectTails.StickersPerLane;
-
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
@@ -31,7 +28,7 @@ namespace WondrousTailsSolver
 
             AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
 
-            QueueLoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
+            LoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
 
             Interface.ClientState.OnLogin += UserWarning;
             if (Interface.ClientState.LocalPlayer != null)
@@ -50,10 +47,9 @@ namespace WondrousTailsSolver
             LoopTokenSource?.Cancel();
         }
 
-        private Task QueueLoopTask;
+        private Task LoopTask;
         private readonly CancellationTokenSource LoopTokenSource = new CancellationTokenSource();
-        private readonly bool[] GameState = new bool[TotalStickers];
-        private string LastTextModification = "A standard default text placeholder that likely won't appear";
+        private readonly bool[] GameState = new bool[16];
         private readonly PerfectTails PerfectTails = new PerfectTails();
 
         private async void GameUpdaterLoop(CancellationToken token)
@@ -70,8 +66,9 @@ namespace WondrousTailsSolver
                 }
             }
             catch (OperationCanceledException) { }
-            catch (Exception)
+            catch (Exception ex)
             {
+                PluginLog.Error(ex, "Updater loop has crashed");
                 Interface.Framework.Gui.Chat.PrintError($"{Name} has encountered a critical error");
             }
         }
@@ -99,19 +96,20 @@ namespace WondrousTailsSolver
             var newlines = currentText.Split('').Length - 1;  // SQEx newline contraption
             if ((stateChanged || !currentText.Contains("1 Line")) && newlines < 2)
             {
-                UpdateTextModification();
+                var modText = GetProbabilityString();
 
                 var modIdx = currentText.IndexOf("1 Line");
                 if (modIdx >= 0)
                 {
-                    currentText = currentText.Substring(0, modIdx) + LastTextModification;
+                    currentText = currentText.Substring(0, modIdx) + modText;
                 }
                 else
                 {
-                    currentText = currentText + "\n" + LastTextModification;
+                    currentText = currentText + "\n" + modText;
                 }
                 var textNodePtr = new IntPtr(textNode);
-                var textPtr = Marshal.StringToHGlobalAnsi($"{currentText}\n{LastTextModification}");
+                var textPtr = Marshal.StringToHGlobalAnsi(currentText);
+
                 AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
                 Marshal.FreeHGlobal(textPtr);
             }
@@ -119,8 +117,8 @@ namespace WondrousTailsSolver
 
         private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
         {
-            bool stateChanged = false;
-            for (var i = 0; i < TotalStickers; i++)
+            var stateChanged = false;
+            for (var i = 0; i < 16; i++)
             {
                 var node = addon->StickerSlotList[i].StickerComponentBase->OwnerNode->AtkResNode.ParentNode;
                 if (node == null)
@@ -133,11 +131,11 @@ namespace WondrousTailsSolver
             return stateChanged;
         }
 
-        private void UpdateTextModification()
+        private string GetProbabilityString()
         {
             var stickersPlaced = GameState.Count(s => s);
             if (stickersPlaced == 9)
-                return;
+                return "";
 
             var sb = new StringBuilder();
             var probs = PerfectTails.Solve(GameState);
@@ -146,7 +144,7 @@ namespace WondrousTailsSolver
                 var stateStr = "[" + string.Join(" ", GameState) + "]";
                 PluginLog.Error($"{Name} failed to solve for {stateStr}");
                 Interface.Framework.Gui.Chat.PrintError($"{Name} failed to solve the given game board");
-                return;
+                return "";
             }
 
             sb.AppendLine($"1 Line: {probs[0] * 100:F2}%");
@@ -161,7 +159,7 @@ namespace WondrousTailsSolver
                 sb.Append($"{sample[1] * 100:F2}%   ");
                 sb.Append($"{sample[2] * 100:F2}%   ");
             }
-            LastTextModification = sb.ToString();
+            return sb.ToString();
         }
     }
 }
