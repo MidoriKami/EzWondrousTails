@@ -6,6 +6,8 @@ namespace WondrousTailsSolver
 {
     public sealed class PerfectTails
     {
+        public readonly double[] Error = new double[] { -1, -1, -1 };
+
         private readonly Dictionary<int, long[]> PossibleBoards = new Dictionary<int, long[]>();
         private readonly Dictionary<int, double[]> SampleProbs = new Dictionary<int, double[]>();
 
@@ -15,42 +17,39 @@ namespace WondrousTailsSolver
             CalculateSamples();
         }
 
-        public long[] GetValues(bool[] cells)
-        {
-            var mask = CellsToMask(cells);
-
-            if (PossibleBoards.TryGetValue(mask, out var counts))
-            {
-                return counts;
-            }
-            else
-            {
-                return new long[] { -1, -1, -1, -1 };
-            }
-        }
-
         public double[] Solve(bool[] cells)
         {
+            var counts = Values(cells);
+
+            if (counts == null)
+                return Error;
+
+            var divisor = (double)counts[0];
+            var probs = counts.Skip(1).Select(c => Math.Round(c / divisor, 4)).ToArray();
+
+            return probs;
+        }
+
+        private long[] Values(bool[] cells)
+        {
             var mask = CellsToMask(cells);
 
             if (PossibleBoards.TryGetValue(mask, out var counts))
             {
-                var divisor = (double)counts[0];
-                var probs = counts.Skip(1).Select(c => Math.Round(c / divisor, 4)).ToArray();
+                var countStr = "[ " + string.Join(" ", counts.Select(c => $"{c,-5}")) + " ]";
+                //Dalamud.Plugin.PluginLog.Information($"Mask={mask,-5} Counts={countStr}");
+                return counts;
+            }
 
-                return probs;
-            }
-            else
-            {
-                return new double[] { -1, -1, -1 };
-            }
+            //Dalamud.Plugin.PluginLog.Information($"Mask={mask} Counts=null");
+            return null;
         }
 
         public double[] GetSample(int stickersPlaced)
         {
             if (SampleProbs.TryGetValue(stickersPlaced, out var probs))
                 return probs;
-            return null;
+            return Error;
         }
 
         private long[] CalculateBoards(int mask, int numStickers, int numRows, int numCols, int numDiags)
@@ -71,7 +70,7 @@ namespace WondrousTailsSolver
 
             if (numStickers > 9)
             {
-                return new long[] { 0, 0, 0, 0 };
+                return PossibleBoards[mask] = new long[] { 0, 0, 0, 0 };
             }
 
             result = PossibleBoards[mask] = new long[] { 0, 0, 0, 0 };
@@ -102,24 +101,23 @@ namespace WondrousTailsSolver
 
         private void CalculateSamples()
         {
-            Random random = new Random();
+            var random = new Random();
+
             for (int stickersPlaced = 1; stickersPlaced <= 7; stickersPlaced++)
             {
                 var samples = new List<double[]>();
-                for (int i = 0; i < 50; i++)
+                for (int i = 0; i < 500; i++)
                 {
                     var sampleState = new bool[16];
                     foreach (var sampleIndex in Enumerable.Range(0, 16).OrderBy(v => random.Next()).Take(stickersPlaced))
                         sampleState[sampleIndex] = true;
                     samples.Add(Solve(sampleState));
                 }
-                var avgSolution = new double[]
-                {
+                SampleProbs[stickersPlaced] = new double[] {
                     Math.Round(samples.Average(s => s[0]), 4),
                     Math.Round(samples.Average(s => s[1]), 4),
                     Math.Round(samples.Average(s => s[2]), 4),
                 };
-                SampleProbs[stickersPlaced] = avgSolution;
             }
         }
 

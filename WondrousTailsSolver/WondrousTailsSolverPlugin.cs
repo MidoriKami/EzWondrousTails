@@ -37,7 +37,7 @@ namespace WondrousTailsSolver
 
         private void UserWarning(object sender, EventArgs args)
         {
-            Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
+            //Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
         }
 
         public void Dispose()
@@ -92,26 +92,16 @@ namespace WondrousTailsSolver
 
             var stateChanged = UpdateGameState(addon);
             var currentText = Marshal.PtrToStringAnsi(new IntPtr(textNode->NodeText.StringPtr));
-
-            var newlines = currentText.Split('').Length - 1;  // SQEx newline contraption
-            if ((stateChanged || !currentText.Contains("1 Line")) && newlines < 2)
+            if (stateChanged || !currentText.Contains(Delimiter))
             {
-                var modText = GetProbabilityString();
-
-                var modIdx = currentText.IndexOf("1 Line");
-                if (modIdx >= 0)
+                var newText = FormatProbabilityString(currentText);
+                //PluginLog.Information($"OldText=\"{currentText}\"");
+                //PluginLog.Information($"NewText=\"{newText}\"");
+                if (currentText != newText)
                 {
-                    currentText = currentText.Substring(0, modIdx) + modText;
+                    //PluginLog.Information($"Writing new text");
+                    SetNodeText(textNode, newText);
                 }
-                else
-                {
-                    currentText = currentText + "\n" + modText;
-                }
-                var textNodePtr = new IntPtr(textNode);
-                var textPtr = Marshal.StringToHGlobalAnsi(currentText);
-
-                AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
-                Marshal.FreeHGlobal(textPtr);
             }
         }
 
@@ -120,46 +110,89 @@ namespace WondrousTailsSolver
             var stateChanged = false;
             for (var i = 0; i < 16; i++)
             {
-                var node = addon->StickerSlotList[i].StickerComponentBase->OwnerNode->AtkResNode.ParentNode;
-                if (node == null)
+                var containerNode = addon->StickerSlotList[i].StickerComponentBase->OwnerNode->AtkResNode.ParentNode;
+                var imageNode = (AtkImageNode*)addon->StickerSlotList[i].StickerResNode->ChildNode;
+
+                if (containerNode == null || imageNode == null)
                     return false;
 
-                var state = node->IsVisible;
+                /*
+                    PartID 0 is a legit sticker, but until nodes are shown for the first time
+                    the node is always zero. So check for the container visibility AND partID
+                */
+
+                var state = containerNode->IsVisible || imageNode->PartId != 0;
                 stateChanged |= GameState[i] != state;
                 GameState[i] = state;
             }
             return stateChanged;
         }
 
-        private string GetProbabilityString()
+        private string[] FormatDoubles(double[] values)
+        {
+            if (values == null)
+                return null;
+
+            if (values == PerfectTails.Error)
+            {
+                return new string[] { ErrorText, ErrorText, ErrorText };
+            }
+            else
+            {
+                return values.Select(v => $"{v * 100:F2}%").ToArray();
+            }
+        }
+
+        private const string Delimiter = "      ";
+
+        private const string ErrorText = "error";
+        private const string ChancesTextBase = "1 Line: {0}\n2 Lines: {1}\n3 Lines: {2}";
+        private const string ChancesShortTextBase = "Line Chances: {0}   {1}   {2}";
+        private const string AverageTextBase = "Shuffle Average: {0}   {1}   {2}";
+
+        private string FormatProbabilityString(string currentText)
         {
             var stickersPlaced = GameState.Count(s => s);
-            if (stickersPlaced == 9)
-                return "";
+
+            // > 9 returns Error {-1,-1,-1} by the solver
+            var probs = PerfectTails.Solve(GameState);
+
+            double[] samples = null;
+            if (stickersPlaced > 0 && stickersPlaced <= 7)
+                samples = PerfectTails.GetSample(stickersPlaced);
+
+            var delimIndex = currentText.IndexOf(Delimiter);
+            if (delimIndex > 0)
+                currentText = currentText.Substring(0, delimIndex);
 
             var sb = new StringBuilder();
-            var probs = PerfectTails.Solve(GameState);
-            if (probs == new double[] { -1, -1, -1 })
+
+            var newlines = currentText.Split('').Length - 1;  // SQEx newline contraption
+            if (newlines > 2)
+                sb.AppendLine(string.Format(ChancesShortTextBase, FormatDoubles(probs)));
+            else
+                sb.AppendLine(string.Format(ChancesTextBase, FormatDoubles(probs)));
+
+            if (samples != null)
             {
-                var stateStr = "[" + string.Join(" ", GameState) + "]";
-                PluginLog.Error($"{Name} failed to solve for {stateStr}");
-                Interface.Framework.Gui.Chat.PrintError($"{Name} failed to solve the given game board");
-                return "";
+                sb.AppendLine(string.Format(AverageTextBase, FormatDoubles(samples)));
             }
 
-            sb.AppendLine($"1 Line: {probs[0] * 100:F2}%");
-            sb.AppendLine($"2 Lines: {probs[1] * 100:F2}%");
-            sb.AppendLine($"3 Lines: {probs[2] * 100:F2}%");
+            return $"{currentText}{Delimiter}\n{sb}";
+        }
 
-            if (stickersPlaced > 0 && stickersPlaced <= 7)
-            {
-                var sample = PerfectTails.GetSample(stickersPlaced);
-                sb.Append($"Shuffle Average: ");
-                sb.Append($"{sample[0] * 100:F2}%   ");
-                sb.Append($"{sample[1] * 100:F2}%   ");
-                sb.Append($"{sample[2] * 100:F2}%   ");
-            }
-            return sb.ToString();
+        private unsafe void SetNodeText(AtkTextNode* textNode, string text)
+        {
+            var textNodePtr = new IntPtr(textNode);
+            var textPtr = Marshal.StringToHGlobalAnsi(text);
+            //var textPtr = Marshal.AllocHGlobal(text.Length + 1);
+            //var textBytes = Encoding.ASCII.GetBytes(text);
+            //Marshal.Copy(textBytes, 0, textPtr, textBytes.Length);
+            //Marshal.WriteByte(textPtr + text.Length, 0);
+
+            AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
+
+            Marshal.FreeHGlobal(textPtr);
         }
     }
 }
