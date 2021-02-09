@@ -35,13 +35,8 @@ namespace WondrousTailsSolver
             var mask = CellsToMask(cells);
 
             if (PossibleBoards.TryGetValue(mask, out var counts))
-            {
-                var countStr = "[ " + string.Join(" ", counts.Select(c => $"{c,-5}")) + " ]";
-                //Dalamud.Plugin.PluginLog.Information($"Mask={mask,-5} Counts={countStr}");
                 return counts;
-            }
 
-            //Dalamud.Plugin.PluginLog.Information($"Mask={mask} Counts=null");
             return null;
         }
 

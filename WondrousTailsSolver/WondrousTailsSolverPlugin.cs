@@ -95,11 +95,8 @@ namespace WondrousTailsSolver
             if (stateChanged || !currentText.Contains(Delimiter))
             {
                 var newText = FormatProbabilityString(currentText);
-                //PluginLog.Information($"OldText=\"{currentText}\"");
-                //PluginLog.Information($"NewText=\"{newText}\"");
                 if (currentText != newText)
                 {
-                    //PluginLog.Information($"Writing new text");
                     SetNodeText(textNode, newText);
                 }
             }
@@ -110,18 +107,12 @@ namespace WondrousTailsSolver
             var stateChanged = false;
             for (var i = 0; i < 16; i++)
             {
-                var containerNode = addon->StickerSlotList[i].StickerComponentBase->OwnerNode->AtkResNode.ParentNode;
-                var imageNode = (AtkImageNode*)addon->StickerSlotList[i].StickerResNode->ChildNode;
+                var imageNode = (AtkImageNode*)addon->StickerSlotList[i].StickerSidebarResNode->ChildNode;
 
-                if (containerNode == null || imageNode == null)
+                if (imageNode == null)
                     return false;
 
-                /*
-                    PartID 0 is a legit sticker, but until nodes are shown for the first time
-                    the node is always zero. So check for the container visibility AND partID
-                */
-
-                var state = containerNode->IsVisible || imageNode->PartId != 0;
+                var state = imageNode->AtkResNode.Alpha_2 == 0x0;
                 stateChanged |= GameState[i] != state;
                 GameState[i] = state;
             }
@@ -185,10 +176,6 @@ namespace WondrousTailsSolver
         {
             var textNodePtr = new IntPtr(textNode);
             var textPtr = Marshal.StringToHGlobalAnsi(text);
-            //var textPtr = Marshal.AllocHGlobal(text.Length + 1);
-            //var textBytes = Encoding.ASCII.GetBytes(text);
-            //Marshal.Copy(textBytes, 0, textPtr, textBytes.Length);
-            //Marshal.WriteByte(textPtr + text.Length, 0);
 
             AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
 
