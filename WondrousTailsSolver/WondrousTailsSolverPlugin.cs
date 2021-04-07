@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
+using Dalamud.Game.Internal;
 
 namespace WondrousTailsSolver
 {
@@ -28,52 +29,37 @@ namespace WondrousTailsSolver
 
             AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
 
-            LoopTask = Task.Run(() => GameUpdaterLoop(LoopTokenSource.Token));
-
-            Interface.ClientState.OnLogin += UserWarning;
-            if (Interface.ClientState.LocalPlayer != null)
-                UserWarning(null, null);
-        }
-
-        private void UserWarning(object sender, EventArgs args)
-        {
-            //Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
+            Interface.Framework.OnUpdateEvent += GameUpdater;
         }
 
         public void Dispose()
         {
-            Interface.ClientState.OnLogin -= UserWarning;
-
-            LoopTokenSource?.Cancel();
+            Interface.Framework.OnUpdateEvent -= GameUpdater;
         }
 
-        private Task LoopTask;
-        private readonly CancellationTokenSource LoopTokenSource = new CancellationTokenSource();
+        private Task GameTask;
         private readonly bool[] GameState = new bool[16];
         private readonly PerfectTails PerfectTails = new PerfectTails();
 
-        private async void GameUpdaterLoop(CancellationToken token)
+        private void GameUpdater(Framework framework)
         {
-            for (int i = 0; i < GameState.Length; i++)
-                GameState[i] = true;
-
             try
             {
-                while (!token.IsCancellationRequested)
+                if (GameTask == null || GameTask.IsCompleted || GameTask.IsFaulted || GameTask.IsCanceled)
                 {
-                    await Task.Delay(100);
-                    GameUpdater(token);
+                    GameTask = new Task(GameUpdater);
+                    GameTask.Start();
                 }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                PluginLog.Error(ex, "Updater loop has crashed");
+                PluginLog.Error(ex, "Updater has crashed");
                 Interface.Framework.Gui.Chat.PrintError($"{Name} has encountered a critical error");
             }
         }
 
-        private unsafe void GameUpdater(CancellationToken token)
+        private unsafe void GameUpdater()
         {
             var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyBingo", 1);
             if (addonPtr == IntPtr.Zero)
@@ -89,6 +75,9 @@ namespace WondrousTailsSolver
             var textNode = (AtkTextNode*)addon->AtkUnitBase.ULDData.NodeList[96];
             if (textNode == null)
                 return;
+
+            for (int i = 0; i < GameState.Length; i++)
+                GameState[i] = true;
 
             var stateChanged = UpdateGameState(addon);
             var currentText = Marshal.PtrToStringAnsi(new IntPtr(textNode->NodeText.StringPtr));
