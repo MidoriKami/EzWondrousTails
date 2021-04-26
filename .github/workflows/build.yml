@@ -42,6 +42,7 @@ jobs:
 
   deploy:
     needs: build
+    if: "!contains(toJSON(github.event.commits.*.message), '[skip-ci]')"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -49,6 +50,7 @@ jobs:
         repository: ${{ env.PERSONAL_PLUGIN_REPO }}
         token: ${{ secrets.PAT }}
     - uses: actions/download-artifact@v2
+      if: "!contains(toJSON(github.event.commits.*.message), '[TEST]')"
       with:
         name: PluginRepoZip
         path: plugins/${{ env.INTERNAL_NAME }}
