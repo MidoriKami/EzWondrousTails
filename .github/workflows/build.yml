@@ -9,13 +9,16 @@ on:
     - master
 
 env:
+  PUBLIC_NAME: ezWondrousTails
   SOLUTION_NAME: WondrousTailsSolver
   INTERNAL_NAME: WondrousTailsSolver
   RELEASE_DIR: WondrousTailsSolver\bin\Release\WondrousTailsSolver
   PERSONAL_PLUGIN_REPO: daemitus/MyDalamudPlugins
+  PR_PLUGIN_REPO: daemitus/DalamudPlugins
 
 jobs:
   build:
+    if: "!contains(toJSON(github.event.commits.*.message), '[skip-ci]')"
     runs-on: windows-latest
     steps:
     - name: Checkout
@@ -42,7 +45,7 @@ jobs:
 
   deploy:
     needs: build
-    if: "!contains(toJSON(github.event.commits.*.message), '[skip-ci]')"
+    if: "!contains(toJSON(github.event.commits.*.message), '[skip-cd]')"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -50,18 +53,27 @@ jobs:
         repository: ${{ env.PERSONAL_PLUGIN_REPO }}
         token: ${{ secrets.PAT }}
     - uses: actions/download-artifact@v2
-      if: "!contains(toJSON(github.event.commits.*.message), '[TEST]')"
       with:
         name: PluginRepoZip
         path: plugins/${{ env.INTERNAL_NAME }}
-    - uses: actions/download-artifact@v2
-      if: "contains(toJSON(github.event.commits.*.message), '[TEST]')"
-      with:
-        name: PluginRepoZip
-        path: testing/${{ env.INTERNAL_NAME }}    
     - uses: EndBug/add-and-commit@v7
       with:
         add: --all
         author_name: GitHub Action
         author_email: github-actions[bot]@users.noreply.github.com
         message: Update ${{ env.INTERNAL_NAME }}
+  
+  pull_request:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      id: download-artifact
+      with:
+        name: PluginRepoZip
+        path: PluginArtifact
+    - uses: daemitus/DalamudPluginPR@v1
+      with: 
+        token: ${{ secrets.PAT }}
+        artifact_path: ${{ steps.download-artifact.outputs.download-path }}
