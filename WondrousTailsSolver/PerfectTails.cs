@@ -8,8 +8,8 @@ namespace WondrousTailsSolver
     {
         public readonly double[] Error = new double[] { -1, -1, -1 };
 
-        private readonly Dictionary<int, long[]> PossibleBoards = new Dictionary<int, long[]>();
-        private readonly Dictionary<int, double[]> SampleProbs = new Dictionary<int, double[]>();
+        private readonly Dictionary<int, long[]> PossibleBoards = new();
+        private readonly Dictionary<int, double[]> SampleProbs = new();
 
         public PerfectTails()
         {

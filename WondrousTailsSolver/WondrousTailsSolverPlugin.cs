@@ -27,7 +27,7 @@ namespace WondrousTailsSolver
         private AtkTextNode_SetText_Delegate AtkTextNode_SetText;
 
         private readonly bool[] GameState = new bool[16];
-        private readonly PerfectTails PerfectTails = new PerfectTails();
+        private readonly PerfectTails PerfectTails = new();
 
         private UIGlowPayload GoldenGlow;
         private UIForegroundPayload SecretDelimiter;
