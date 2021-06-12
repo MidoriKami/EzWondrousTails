@@ -292,7 +292,18 @@ namespace WondrousTailsSolver
         private SeString RemoveProbabilityString(SeString seString)
         {
             if (SeStringTryFindDelimiter(seString, out var index))
-                seString.Payloads.RemoveRange(index, seString.Payloads.Count - 1);
+            {
+                var removeCount = seString.Payloads.Count - index;
+                try
+                {
+                    seString.Payloads.RemoveRange(index, removeCount);
+                }
+                catch (ArgumentException)
+                {
+                    PluginLog.Warning($"ArgExc during RemoveProbabilityString, count={seString.Payloads.Count} index={index} removeCount={removeCount}");
+                }
+            }
+
             return seString;
         }
 
