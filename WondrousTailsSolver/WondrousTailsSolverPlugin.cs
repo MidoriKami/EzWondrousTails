@@ -13,6 +13,11 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Dalamud.Logging;
+using Dalamud.Game.ClientState;
+using Dalamud.Game.Gui;
+using Dalamud.IoC;
+using Dalamud.Game;
 
 namespace WondrousTailsSolver
 {
@@ -20,46 +25,51 @@ namespace WondrousTailsSolver
     {
         public string Name => "ezWondrousTails";
 
-        internal DalamudPluginInterface Interface;
-        internal PluginAddressResolver Address;
+        internal PluginAddressResolver Address { get; init; }
+        internal DalamudPluginInterface Interface { get; init; }
+        internal SeStringManager SeStringManager { get; init; }
 
-        private Hook<AddonWeeklyBingo_Update_Delegate> AddonWeeklyBingo_Update_Hook;
-        private AtkTextNode_SetText_Delegate AtkTextNode_SetText;
+        private readonly Hook<AddonWeeklyBingo_Update_Delegate> AddonWeeklyBingo_Update_Hook;
+        private readonly AtkTextNode_SetText_Delegate AtkTextNode_SetText;
 
         private readonly bool[] GameState = new bool[16];
         private readonly PerfectTails PerfectTails = new();
 
-        private UIGlowPayload GoldenGlow;
-        private UIForegroundPayload SecretDelimiter;
-        private UIForegroundPayload HappyGreen;
-        private UIForegroundPayload MellowYellow;
-        private UIForegroundPayload PinkSalmon;
-        private UIForegroundPayload AngryRed;
-        private UIForegroundPayload ColorOff;
-        private UIGlowPayload GlowOff;
+        private readonly UIGlowPayload GoldenGlow;
+        private readonly UIForegroundPayload SecretDelimiter;
+        private readonly UIForegroundPayload HappyGreen;
+        private readonly UIForegroundPayload MellowYellow;
+        private readonly UIForegroundPayload PinkSalmon;
+        private readonly UIForegroundPayload AngryRed;
+        private readonly UIForegroundPayload ColorOff;
+        private readonly UIGlowPayload GlowOff;
 
         private SeString LastCalculatedChancesSeString;
         private readonly TextPayload ErrorText = new("error");
         private readonly TextPayload ChancesText = new("Line Chances: ");
         private readonly TextPayload ShuffleText = new("\rShuffle Average: ");
 
-        public void Initialize(DalamudPluginInterface pluginInterface)
+        public WondrousTailsSolverPlugin(
+            [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
+            [RequiredVersion("1.0")] SeStringManager seStringManager)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
-            Address = new PluginAddressResolver();
-            Address.Setup(Interface.TargetModuleScanner);
+            SeStringManager = seStringManager;
 
-            SecretDelimiter = new UIForegroundPayload(Interface.Data, 51);
-            GoldenGlow = new UIGlowPayload(Interface.Data, 2);
-            HappyGreen = new UIForegroundPayload(Interface.Data, 67);
-            MellowYellow = new UIForegroundPayload(Interface.Data, 66);
-            PinkSalmon = new UIForegroundPayload(Interface.Data, 561);
-            AngryRed = new UIForegroundPayload(Interface.Data, 704);
+            Address = new PluginAddressResolver();
+            Address.Setup();
+
+            SecretDelimiter = new UIForegroundPayload(51);
+            GoldenGlow = new UIGlowPayload(2);
+            HappyGreen = new UIForegroundPayload(67);
+            MellowYellow = new UIForegroundPayload(66);
+            PinkSalmon = new UIForegroundPayload(561);
+            AngryRed = new UIForegroundPayload(704);
             ColorOff = UIForegroundPayload.UIForegroundOff;
             GlowOff = UIGlowPayload.UIGlowOff;
 
-            AddonWeeklyBingo_Update_Hook = new(Address.AddonWeeklyBingo_Update_Address, new AddonWeeklyBingo_Update_Delegate(AddonWeeklyBingo_Update_Detour), this);
+            AddonWeeklyBingo_Update_Hook = new(Address.AddonWeeklyBingo_Update_Address, AddonWeeklyBingo_Update_Detour);
             AddonWeeklyBingo_Update_Hook.Enable();
 
             AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
@@ -78,7 +88,7 @@ namespace WondrousTailsSolver
             {
                 var addon = (AddonWeeklyBingo*)addonPtr;
 
-                if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.ULDData.LoadedState != 3)
+                if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
                 {
                     PluginLog.Debug("Addon not ready yet");
                     LastCalculatedChancesSeString = null;
@@ -100,13 +110,13 @@ namespace WondrousTailsSolver
                     for (int i = 0; i < GameState.Length; i++)
                     {
                         sb.Append(GameState[i] ? "☒" : "☐");
-                        if ((i + 1) % 4 == 0) sb.Append(" ");
+                        if ((i + 1) % 4 == 0) sb.Append(' ');
                     }
                     PluginLog.Debug($"State has changed: {sb}");
 
                     var textNode = addon->StringThing.TextNode;
                     var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
-                    var existingSeString = Interface.SeStringManager.Parse(existingBytes);
+                    var existingSeString = SeStringManager.Parse(existingBytes);
 
                     RemoveProbabilityString(existingSeString);
 
@@ -119,7 +129,7 @@ namespace WondrousTailsSolver
                 {
                     var textNode = addon->StringThing.TextNode;
                     var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
-                    var existingSeString = Interface.SeStringManager.Parse(existingBytes);
+                    var existingSeString = SeStringManager.Parse(existingBytes);
 
                     // Check for the Chances textPayload, if it doesn't exist we add the last known probString
                     if (!SeStringContainsProbabilityString(existingSeString))
