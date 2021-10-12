@@ -3,21 +3,13 @@ using System;
 using System.Linq;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
-using Dalamud.Game.Internal;
 using Dalamud.Hooking;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Dalamud.Logging;
-using Dalamud.Game.ClientState;
-using Dalamud.Game.Gui;
-using Dalamud.IoC;
-using Dalamud.Game;
 
 namespace WondrousTailsSolver
 {
@@ -27,7 +19,6 @@ namespace WondrousTailsSolver
 
         internal PluginAddressResolver Address { get; init; }
         internal DalamudPluginInterface Interface { get; init; }
-        internal SeStringManager SeStringManager { get; init; }
 
         private readonly Hook<AddonWeeklyBingo_Update_Delegate> AddonWeeklyBingo_Update_Hook;
         private readonly AtkTextNode_SetText_Delegate AtkTextNode_SetText;
@@ -49,13 +40,9 @@ namespace WondrousTailsSolver
         private readonly TextPayload ChancesText = new("Line Chances: ");
         private readonly TextPayload ShuffleText = new("\rShuffle Average: ");
 
-        public WondrousTailsSolverPlugin(
-            [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
-            [RequiredVersion("1.0")] SeStringManager seStringManager)
+        public WondrousTailsSolverPlugin(DalamudPluginInterface pluginInterface)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
-
-            SeStringManager = seStringManager;
 
             Address = new PluginAddressResolver();
             Address.Setup();
@@ -116,7 +103,7 @@ namespace WondrousTailsSolver
 
                     var textNode = addon->StringThing.TextNode;
                     var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
-                    var existingSeString = SeStringManager.Parse(existingBytes);
+                    var existingSeString = SeString.Parse(existingBytes);
 
                     RemoveProbabilityString(existingSeString);
 
@@ -129,7 +116,7 @@ namespace WondrousTailsSolver
                 {
                     var textNode = addon->StringThing.TextNode;
                     var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
-                    var existingSeString = SeStringManager.Parse(existingBytes);
+                    var existingSeString = SeString.Parse(existingBytes);
 
                     // Check for the Chances textPayload, if it doesn't exist we add the last known probString
                     if (!SeStringContainsProbabilityString(existingSeString))
