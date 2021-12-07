@@ -1,5 +1,4 @@
 ﻿using Dalamud.Game;
-using Dalamud.Game.Internal;
 using System;
 
 namespace WondrousTailsSolver
