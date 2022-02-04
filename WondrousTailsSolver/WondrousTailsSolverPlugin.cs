@@ -48,7 +48,7 @@ namespace WondrousTailsSolver
         [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
         private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
 
-        private readonly Hook<AddonWeeklyBingo_Update_Delegate> addonUpdateHook;
+        private readonly Hook<AddonUpdateDelegate> addonUpdateHook;
         private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
 
         private SeString? lastCalculatedChancesSeString;
@@ -70,7 +70,7 @@ namespace WondrousTailsSolver
             this.addonUpdateHook.Enable();
         }
 
-        private delegate void AddonWeeklyBingo_Update_Delegate(IntPtr addonPtr, float deltaLastUpdate);
+        private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
 
         private delegate void DutyReceiveEventDelegate(IntPtr addonPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5);
 
@@ -398,7 +398,6 @@ namespace WondrousTailsSolver
         [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Offset ordering")]
         private struct WondrousTails
         {
-            // WeeklyBingoOrderData rowID
             [FieldOffset(0x06)]
             public fixed byte Tasks[16];
 
