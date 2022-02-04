@@ -106,7 +106,7 @@ namespace WondrousTailsSolver
                     this.addonDutyReceiveEventHook.Enable();
                 }
 
-                var stateChanged = this.UpdateGameState();
+                var stateChanged = this.UpdateGameState(addon);
 
                 if (stateChanged)
                 {
@@ -223,7 +223,7 @@ namespace WondrousTailsSolver
             }
         }
 
-        private unsafe bool UpdateGameState()
+        private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
         {
             if (this.wondrousTailsData == null)
                 return false;
@@ -231,7 +231,12 @@ namespace WondrousTailsSolver
             var stateChanged = false;
             for (var i = 0; i < 16; i++)
             {
-                var state = this.wondrousTailsData->TaskStatus(i) == ButtonState.Unavailable;
+                var imageNode = (AtkImageNode*)addon->StickerSlotList[i].StickerSidebarResNode->ChildNode;
+
+                if (imageNode == null)
+                    return false;
+
+                var state = imageNode->AtkResNode.Alpha_2 == 0;
                 stateChanged |= this.gameState[i] != state;
                 this.gameState[i] = state;
             }
