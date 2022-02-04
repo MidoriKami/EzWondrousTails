@@ -1,75 +1,92 @@
-﻿using Dalamud.Plugin;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using FFXIVClientStructs.FFXIV.Client.UI;
-using FFXIVClientStructs.FFXIV.Component.GUI;
 using System.Runtime.InteropServices;
 using System.Text;
-using Dalamud.Hooking;
+
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using System.Collections.Generic;
+using Dalamud.Hooking;
 using Dalamud.Logging;
+using Dalamud.Plugin;
+using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+
+using Sheets = Lumina.Excel.GeneratedSheets;
 
 namespace WondrousTailsSolver
 {
-    public sealed class WondrousTailsSolverPlugin : IDalamudPlugin
+    /// <summary>
+    /// Main plugin implementation.
+    /// </summary>
+    public sealed unsafe partial class WondrousTailsSolverPlugin : IDalamudPlugin
     {
-        public string Name => "ezWondrousTails";
+        private static readonly UIGlowPayload GoldenGlow = new(2);
+        private static readonly UIForegroundPayload SecretDelimiter = new(51);
+        private static readonly UIForegroundPayload HappyGreen = new(67);
+        private static readonly UIForegroundPayload MellowYellow = new(66);
+        private static readonly UIForegroundPayload PinkSalmon = new(561);
+        private static readonly UIForegroundPayload AngryRed = new(704);
+        private static readonly UIForegroundPayload ColorOff = UIForegroundPayload.UIForegroundOff;
+        private static readonly UIGlowPayload GlowOff = UIGlowPayload.UIGlowOff;
 
-        internal PluginAddressResolver Address { get; init; }
-        internal DalamudPluginInterface Interface { get; init; }
+        private static readonly TextPayload ErrorText = new("error");
+        private static readonly TextPayload ChancesText = new("Line Chances: ");
+        private static readonly TextPayload ShuffleText = new("\rShuffle Average: ");
 
-        private readonly Hook<AddonWeeklyBingo_Update_Delegate> AddonWeeklyBingo_Update_Hook;
-        private readonly AtkTextNode_SetText_Delegate AtkTextNode_SetText;
+        private readonly PerfectTails perfectTails = new();
+        private readonly bool[] gameState = new bool[16];
 
-        private readonly bool[] GameState = new bool[16];
-        private readonly PerfectTails PerfectTails = new();
+        [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
+        private readonly WondrousTails* wondrousTailsData = null!;
 
-        private readonly UIGlowPayload GoldenGlow;
-        private readonly UIForegroundPayload SecretDelimiter;
-        private readonly UIForegroundPayload HappyGreen;
-        private readonly UIForegroundPayload MellowYellow;
-        private readonly UIForegroundPayload PinkSalmon;
-        private readonly UIForegroundPayload AngryRed;
-        private readonly UIForegroundPayload ColorOff;
-        private readonly UIGlowPayload GlowOff;
+        [Signature("48 89 6C 24 ?? 48 89 74 24 ?? 57 48 81 EC ?? ?? ?? ?? 48 8B F9 41 0F B6 E8")]
+        private readonly delegate* unmanaged<AgentInterface*, uint, byte, IntPtr> openRegularDuty = null!;
 
-        private SeString LastCalculatedChancesSeString;
-        private readonly TextPayload ErrorText = new("error");
-        private readonly TextPayload ChancesText = new("Line Chances: ");
-        private readonly TextPayload ShuffleText = new("\rShuffle Average: ");
+        [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
+        private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
 
+        private readonly Hook<AddonWeeklyBingo_Update_Delegate> addonUpdateHook;
+        private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
+
+        private SeString? lastCalculatedChancesSeString;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WondrousTailsSolverPlugin"/> class.
+        /// </summary>
+        /// <param name="pluginInterface">Dalamud plugin interface.</param>
         public WondrousTailsSolverPlugin(DalamudPluginInterface pluginInterface)
         {
-            Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
+            pluginInterface.Create<Service>();
 
-            Address = new PluginAddressResolver();
-            Address.Setup();
+            FFXIVClientStructs.Resolver.Initialize();
+            SignatureHelper.Initialise(this, true);
 
-            SecretDelimiter = new UIForegroundPayload(51);
-            GoldenGlow = new UIGlowPayload(2);
-            HappyGreen = new UIForegroundPayload(67);
-            MellowYellow = new UIForegroundPayload(66);
-            PinkSalmon = new UIForegroundPayload(561);
-            AngryRed = new UIForegroundPayload(704);
-            ColorOff = UIForegroundPayload.UIForegroundOff;
-            GlowOff = UIGlowPayload.UIGlowOff;
+            var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
 
-            AddonWeeklyBingo_Update_Hook = new(Address.AddonWeeklyBingo_Update_Address, AddonWeeklyBingo_Update_Detour);
-            AddonWeeklyBingo_Update_Hook.Enable();
-
-            AtkTextNode_SetText = Marshal.GetDelegateForFunctionPointer<AtkTextNode_SetText_Delegate>(Address.AtkTextNode_SetText_Address);
+            this.addonUpdateHook = new(addonUpdatePtr, this.AddonUpdateDetour);
+            this.addonUpdateHook.Enable();
         }
 
+        private delegate void AddonWeeklyBingo_Update_Delegate(IntPtr addonPtr, float deltaLastUpdate);
+
+        private delegate void DutyReceiveEventDelegate(IntPtr addonPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5);
+
+        /// <inheritdoc/>
+        public string Name => "ezWondrousTails";
+
+        /// <inheritdoc/>
         public void Dispose()
         {
-            AddonWeeklyBingo_Update_Hook.Dispose();
+            this.addonUpdateHook?.Dispose();
+            this.addonDutyReceiveEventHook?.Dispose();
         }
 
-        private unsafe void AddonWeeklyBingo_Update_Detour(IntPtr addonPtr, float deltaLastUpdate)
+        private unsafe void AddonUpdateDetour(IntPtr addonPtr, float deltaLastUpdate)
         {
-            AddonWeeklyBingo_Update_Hook.Original(addonPtr, deltaLastUpdate);
+            this.addonUpdateHook.Original(addonPtr, deltaLastUpdate);
 
             try
             {
@@ -78,51 +95,60 @@ namespace WondrousTailsSolver
                 if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
                 {
                     PluginLog.Debug("Addon not ready yet");
-                    LastCalculatedChancesSeString = null;
+                    this.lastCalculatedChancesSeString = null;
                     return;
                 }
 
-                var stateChanged = UpdateGameState(addon);
+                if (this.addonDutyReceiveEventHook == null)
+                {
+                    var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
+                    this.addonDutyReceiveEventHook = new Hook<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+                    this.addonDutyReceiveEventHook.Enable();
+                }
+
+                var stateChanged = this.UpdateGameState();
+
                 if (stateChanged)
                 {
-                    var placedStickers = GameState.Count(b => b);
+                    var placedStickers = this.gameState.Count(b => b);
                     if (placedStickers == 0 || placedStickers == 16 || placedStickers > 7)
                     {
                         // 0 and 16 are seen when the addon is loading. > 7 shuffling is disabled
-                        LastCalculatedChancesSeString = null;
+                        this.lastCalculatedChancesSeString = null;
                         return;
                     }
 
                     var sb = new StringBuilder();
-                    for (int i = 0; i < GameState.Length; i++)
+                    for (int i = 0; i < this.gameState.Length; i++)
                     {
-                        sb.Append(GameState[i] ? "☒" : "☐");
+                        sb.Append(this.gameState[i] ? "X" : "O");
                         if ((i + 1) % 4 == 0) sb.Append(' ');
                     }
+
                     PluginLog.Debug($"State has changed: {sb}");
 
                     var textNode = addon->StringThing.TextNode;
-                    var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
+                    var existingBytes = this.ReadSeStringBytes(textNode);
                     var existingSeString = SeString.Parse(existingBytes);
 
-                    RemoveProbabilityString(existingSeString);
+                    this.RemoveProbabilityString(existingSeString);
 
-                    var probString = LastCalculatedChancesSeString = SolveAndGetProbabilitySeString();
+                    var probString = this.lastCalculatedChancesSeString = this.SolveAndGetProbabilitySeString();
                     existingSeString.Append(probString);
 
-                    SetNodeText(textNode, existingSeString.Encode());
+                    textNode->SetText(existingSeString.Encode());
                 }
-                else if (LastCalculatedChancesSeString != null)
+                else if (this.lastCalculatedChancesSeString != null)
                 {
                     var textNode = addon->StringThing.TextNode;
-                    var existingBytes = ReadSeStringBytes(new IntPtr(textNode->NodeText.StringPtr));
+                    var existingBytes = this.ReadSeStringBytes(textNode);
                     var existingSeString = SeString.Parse(existingBytes);
 
                     // Check for the Chances textPayload, if it doesn't exist we add the last known probString
-                    if (!SeStringContainsProbabilityString(existingSeString))
+                    if (!this.SeStringContainsProbabilityString(existingSeString))
                     {
-                        existingSeString.Append(LastCalculatedChancesSeString);
-                        SetNodeText(textNode, existingSeString.Encode());
+                        existingSeString.Append(this.lastCalculatedChancesSeString);
+                        textNode->SetText(existingSeString.Encode());
                     }
                 }
             }
@@ -132,47 +158,108 @@ namespace WondrousTailsSolver
             }
         }
 
-        private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
+        private void AddonDutyReceiveEventDetour(IntPtr dutyPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5)
         {
+            this.addonDutyReceiveEventHook?.Original(dutyPtr, a2, a3, a4, a5);
+
+            try
+            {
+                if (this.wondrousTailsData == null)
+                    return;
+
+                var duty = (DutySlot*)dutyPtr;
+                var status = this.wondrousTailsData->TaskStatus(duty->index);
+                if (status == ButtonState.Completable)
+                {
+                    var orderDataID = this.wondrousTailsData->Tasks[duty->index];
+                    var orderDataSheet = Service.DataManager.GetExcelSheet<Sheets.WeeklyBingoOrderData>()!;
+                    var orderDataRow = orderDataSheet.GetRow(orderDataID)!;
+
+                    var contentID = orderDataRow.Data;
+                    if (contentID < 1000)
+                    {
+                        uint cfcID = orderDataID switch
+                        {
+                            001 => 004, // 1-49  Sastasha
+                            002 => 010, // 50    Wanderer's Palace
+                            003 => 036, // 51-59 Dusk Vigil
+                            004 => 038, // 60    Aetherochemical Research Facility
+                            059 => 238, // 61-69 Sirensong Sea
+                            060 => 247, // 70    Ala Mhigo
+                            085 => 676, // 71-79 Holminster Switch
+                            086 => 652, // 80    Amaurot
+                            108 => 783, // 81-89 Tower of Zot
+                            109 => 792, // 90    Dead Ends
+                            046 => 000, // Maps
+                            052 => 000, // The Feast (doesn't work)
+                            053 => 000, // PotD/HoH
+                            054 => 127, // Frontline: Borderland Ruins
+                            067 => 277, // Rival Wings: Astralagos
+                            _ => 0,
+                        };
+
+                        if (cfcID == 0)
+                            return;
+
+                        this.OpenRegularDuty(cfcID);
+                    }
+                    else
+                    {
+                        PluginLog.Information($"BBBB {orderDataID} => {contentID}");
+
+                        var cfcSheet = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!;
+                        var contents = cfcSheet.FirstOrDefault(row => row.Content == contentID);
+                        if (contents == default)
+                            return;
+
+                        var cfcID = contents.RowId;
+                        this.OpenRegularDuty(cfcID);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "Boom");
+            }
+        }
+
+        private unsafe bool UpdateGameState()
+        {
+            if (this.wondrousTailsData == null)
+                return false;
+
             var stateChanged = false;
             for (var i = 0; i < 16; i++)
             {
-                var imageNode = (AtkImageNode*)addon->StickerSlotList[i].StickerSidebarResNode->ChildNode;
-
-                if (imageNode == null)
-                    return false;
-
-                var state = imageNode->AtkResNode.Alpha_2 == 0;
-                stateChanged |= GameState[i] != state;
-                GameState[i] = state;
+                var state = this.wondrousTailsData->TaskStatus(i) == ButtonState.Unavailable;
+                stateChanged |= this.gameState[i] != state;
+                this.gameState[i] = state;
             }
+
             return stateChanged;
         }
 
-        private byte[] ReadSeStringBytes(IntPtr stringPtr)
+        private byte[] ReadSeStringBytes(AtkTextNode* node)
         {
-            if (stringPtr == IntPtr.Zero)
-                return null;
+            var utf8str = &node->NodeText;
 
-            var size = 0;
-            while (Marshal.ReadByte(stringPtr, size) != 0)
-                size++;
+            if (node == null || utf8str->StringPtr == null || utf8str->BufUsed <= 1)
+                return Array.Empty<byte>();
 
-            var bytes = new byte[size];
-            Marshal.Copy(stringPtr, bytes, 0, size);
-            return bytes;
+            var span = new Span<byte>(utf8str->StringPtr, (int)(utf8str->BufUsed - 1));
+            return span.ToArray();
         }
 
         private SeString SolveAndGetProbabilitySeString()
         {
-            var stickersPlaced = GameState.Count(s => s);
+            var stickersPlaced = this.gameState.Count(s => s);
 
             // > 9 returns Error {-1,-1,-1} by the solver
-            var values = PerfectTails.Solve(GameState);
+            var values = this.perfectTails.Solve(this.gameState);
 
-            double[] samples = null;
+            double[]? samples = null;
             if (stickersPlaced > 0 && stickersPlaced <= 7)
-                samples = PerfectTails.GetSample(stickersPlaced);
+                samples = this.perfectTails.GetSample(stickersPlaced);
 
             if (values == PerfectTails.Error)
             {
@@ -186,7 +273,7 @@ namespace WondrousTailsSolver
             }
             else
             {
-                var valuePayloads = StringFormatDoubles(values);
+                var valuePayloads = this.StringFormatDoubles(values);
                 var seString = new SeString(new List<Payload>())
                     .Append(SecretDelimiter).Append("\r").Append(ColorOff)
                     .Append(ChancesText);
@@ -200,28 +287,36 @@ namespace WondrousTailsSolver
                         var sampleBoundUpper = Math.Min(1, sample + bound);
 
                         if (value == 1)
+                        {
                             seString.Append(GoldenGlow).Append(valuePayload).Append(GlowOff);
-
-                        else if (1 > value && value >= sample)
+                        }
+                        else if (value < 1 && value >= sample)
+                        {
                             seString.Append(HappyGreen).Append(valuePayload).Append(ColorOff);
-
+                        }
                         else if (sample > value && value > sampleBoundLower)
+                        {
                             seString.Append(MellowYellow).Append(valuePayload).Append(ColorOff);
-
+                        }
                         else if (sampleBoundLower > value && value > 0)
+                        {
                             seString.Append(PinkSalmon).Append(valuePayload).Append(ColorOff);
-
+                        }
                         else if (value == 0)
+                        {
                             seString.Append(AngryRed).Append(valuePayload).Append(ColorOff);
-
-                        else  // Just incase
+                        }
+                        else
+                        {
+                            // Just incase
                             seString.Append(valuePayload);
+                        }
 
                         seString.Append("  ");
                     }
 
                     seString.Append(ShuffleText);
-                    var sampleStrings = StringFormatDoubles(samples);
+                    var sampleStrings = this.StringFormatDoubles(samples);
                     foreach (var sampleString in sampleStrings)
                         seString.Append(sampleString).Append("  ");
                 }
@@ -231,41 +326,17 @@ namespace WondrousTailsSolver
                         seString.Append(valueString).Append("  ");
                 }
 
-                /*
-                UIForegroundPayload UIForeground(ushort id) => new UIForegroundPayload(Interface.Data, id);
-                UIGlowPayload UIGlow(ushort id) => new UIGlowPayload(Interface.Data, id);
-
-                var sheet = Interface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.UIColor>();
-                int i = 1;
-                List<uint> ignored = new();
-                foreach (var row in sheet)
-                {
-                    if (ignored.Contains(row.RowId))
-                        continue;
-
-                    seString.Append(UIGlow((ushort)row.RowId));
-                    //seString.Append(UIForeground((ushort)row.RowId));
-                    seString.Append($"Ex{row.RowId:D3} ");
-                    //seString.Append(ColorOff);
-                    seString.Append(GlowOff);
-
-                    i++;
-                    if (i % 4 == 0)
-                        seString.Append("\n");
-                }
-                */
-
-
                 return seString;
             }
         }
 
-        private TextPayload[] StringFormatDoubles(double[] values) => values.Select(v => new TextPayload($"{v * 100:F2}%")).ToArray();
+        private TextPayload[] StringFormatDoubles(double[] values)
+            => values.Select(v => new TextPayload($"{v * 100:F2}%")).ToArray();
 
         private bool SeStringTryFindDelimiter(SeString seString, out int index)
         {
             var secretBytes = SecretDelimiter.Encode();
-            for (int i = 0; i < seString.Payloads.Count; i++)
+            for (var i = 0; i < seString.Payloads.Count; i++)
             {
                 var payload = seString.Payloads[i];
                 if (payload is UIForegroundPayload)
@@ -277,18 +348,17 @@ namespace WondrousTailsSolver
                     }
                 }
             }
+
             index = -1;
             return false;
         }
 
         private bool SeStringContainsProbabilityString(SeString seString)
-        {
-            return SeStringTryFindDelimiter(seString, out var _);
-        }
+            => this.SeStringTryFindDelimiter(seString, out var _);
 
         private SeString RemoveProbabilityString(SeString seString)
         {
-            if (SeStringTryFindDelimiter(seString, out var index))
+            if (this.SeStringTryFindDelimiter(seString, out var index))
             {
                 var removeCount = seString.Payloads.Count - index;
                 try
@@ -304,14 +374,69 @@ namespace WondrousTailsSolver
             return seString;
         }
 
-        private unsafe void SetNodeText(AtkTextNode* textNode, byte[] bytes)
+        private AgentInterface* GetAgentContentsFinder()
         {
-            var textNodePtr = new IntPtr(textNode);
-            var textPtr = Marshal.AllocHGlobal(bytes.Length + 1);
-            Marshal.Copy(bytes, 0, textPtr, bytes.Length);
-            Marshal.WriteByte(textPtr, bytes.Length, 0);  // null terminated
-            AtkTextNode_SetText(textNodePtr, textPtr, IntPtr.Zero);
-            Marshal.FreeHGlobal(textPtr);
+            var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
+            var uiModule = framework->GetUiModule();
+            var agentModule = uiModule->GetAgentModule();
+            return agentModule->GetAgentByInternalId(AgentId.ContentsFinder);
+        }
+
+        private void OpenRegularDuty(uint contentFinderCondition)
+        {
+            var agent = this.GetAgentContentsFinder();
+            this.openRegularDuty(agent, contentFinderCondition, 0);
+        }
+
+        private void OpenRouletteDuty(byte roulette)
+        {
+            var agent = this.GetAgentContentsFinder();
+            this.openRouletteDuty(agent, roulette, 0);
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Offset ordering")]
+        private struct WondrousTails
+        {
+            // WeeklyBingoOrderData rowID
+            [FieldOffset(0x06)]
+            public fixed byte Tasks[16];
+
+            [FieldOffset(0x16)]
+            public uint Rewards;
+
+            [FieldOffset(0x1A)]
+            private readonly ushort stickerBits;
+
+            [FieldOffset(0x1E)]
+            public ushort WeeklyKey;
+
+            [FieldOffset(0x20)]
+            private readonly ushort secondChanceBits;
+
+            [FieldOffset(0x22)]
+            private fixed byte taskStatus[4];
+
+            public int Stickers
+                => CountSetBits(this.stickerBits);
+
+            public int SecondChance
+                => (this.secondChanceBits >> 7) & 0b1111;
+
+            public ButtonState TaskStatus(int idx)
+                => (ButtonState)((this.taskStatus[idx >> 2] >> ((idx & 0b11) * 2)) & 0b11);
+
+            private static int CountSetBits(int n)
+            {
+                int count = 0;
+                while (n > 0)
+                {
+                    count += n & 1;
+                    n >>= 1;
+                }
+
+                return count;
+            }
         }
     }
 }

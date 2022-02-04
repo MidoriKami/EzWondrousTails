@@ -12,11 +12,19 @@
   <PropertyGroup>
     <TargetFramework>net5.0-windows</TargetFramework>
     <Platforms>x64</Platforms>
+    <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\$(Configuration)\</OutputPath>
+    <NoWarn>CS1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Documentation">
+    <DocumentationFile></DocumentationFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,9 +37,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AdditionalFiles Include="..\stylecop.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="DalamudPackager" Version="2.1.5" />
     <PackageReference Include="ILRepack" Version="2.0.18" GeneratePathProperty="true" />
     <ProjectReference Include="..\lib\FFXIVClientStructs\FFXIVClientStructs\FFXIVClientStructs.csproj" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.333">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
@@ -48,6 +64,15 @@
       <HintPath>$(DalamudLibPath)ImGuiScene.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Lumina">
+      <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Lumina.Excel">
+      <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
   </ItemGroup>
 
   <Target Name="ILRepack" AfterTargets="Build">
@@ -60,12 +85,12 @@
 
   <Target Name="CleanOutDir" AfterTargets="ILRepack">
     <ItemGroup>
-      <DeleteAssemblies Include="$(TargetDir)*.dll" Exclude="$(TargetDir)$(TargetName).dll" />
-      <DeleteAssemblies Include="$(TargetDir)*.pdb" Exclude="$(TargetDir)$(TargetName).pdb" />
+      <DeleteFiles Include="$(TargetDir)*.dll" Exclude="$(TargetDir)$(TargetName).dll" />
+      <DeleteFiles Include="$(TargetDir)*.pdb" Exclude="$(TargetDir)$(TargetName).pdb" />
+      <DeleteFiles Include="$(TargetDir)*.xml" />
     </ItemGroup>
-    <Message Text="Deleting @(DeleteAssemblies)" Importance="high" />
-    <Delete Files="@(DeleteAssemblies)" />
+    <Message Text="Deleting @(DeleteFiles)" Importance="high" />
+    <Delete Files="@(DeleteFiles)" />
   </Target>
-
 </Project>
 
