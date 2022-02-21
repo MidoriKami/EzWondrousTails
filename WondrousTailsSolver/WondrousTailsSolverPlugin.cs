@@ -205,8 +205,6 @@ namespace WondrousTailsSolver
                     }
                     else
                     {
-                        PluginLog.Information($"BBBB {orderDataID} => {contentID}");
-
                         var cfcSheet = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!;
                         var contents = cfcSheet.FirstOrDefault(row => row.Content == contentID);
                         if (contents == default)
