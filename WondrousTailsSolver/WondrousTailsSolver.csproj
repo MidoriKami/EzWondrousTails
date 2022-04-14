@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
-    <Version>2.1.1.2</Version>
+    <Version>2.1.2.0</Version>
     <Authors>daemitus</Authors>
     <Company>-</Company>
     <Description></Description>
@@ -41,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.5" />
+    <PackageReference Include="DalamudPackager" Version="2.1.6" />
     <PackageReference Include="ILRepack" Version="2.0.18" GeneratePathProperty="true" />
     <ProjectReference Include="..\lib\FFXIVClientStructs\FFXIVClientStructs\FFXIVClientStructs.csproj" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.333">
