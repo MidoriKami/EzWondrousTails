@@ -195,6 +195,17 @@ namespace WondrousTailsSolver
                             053 => 000, // PotD/HoH
                             054 => 127, // Frontline: Borderland Ruins
                             067 => 277, // Rival Wings: Astralagos
+                            // 6.1
+                            121 => 093, // Binding Coil of Bahamut
+                            122 => 098, // Second Coil of Bahamut
+                            123 => 107, // Final Coil of Bahamut
+                            124 => 112, // Alexander: Gordias
+                            125 => 136, // Alexander: Midas
+                            126 => 186, // Alexander: The Creator
+                            127 => 252, // Omega: Deltascape
+                            128 => 286, // Omega: Sigmascape
+                            129 => 587, // Omega: Alphascape
+
                             _ => 0,
                         };
 
