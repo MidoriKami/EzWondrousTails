@@ -180,22 +180,22 @@ namespace WondrousTailsSolver
                     {
                         uint cfcID = orderDataID switch
                         {
-                            001 => 004, // 1-49  Sastasha
-                            002 => 010, // 50    Wanderer's Palace
-                            003 => 036, // 51-59 Dusk Vigil
-                            004 => 038, // 60    Aetherochemical Research Facility
-                            059 => 238, // 61-69 Sirensong Sea
-                            060 => 247, // 70    Ala Mhigo
-                            085 => 676, // 71-79 Holminster Switch
-                            086 => 652, // 80    Amaurot
-                            108 => 783, // 81-89 Tower of Zot
-                            109 => 792, // 90    Dead Ends
+                            // CFC => WBO
+                            001 => 004, // Dungeons (Lv. 1-49)  => Sastasha
+                            002 => 010, // Dungeons (Lv. 50)    => Wanderer's Palace
+                            003 => 036, // Dungeons (Lv. 51-59) => Dusk Vigil
+                            004 => 038, // Dungeons (Lv. 60)    => Aetherochemical Research Facility
+                            059 => 238, // Dungeons (Lv. 61-69) => Sirensong Sea
+                            060 => 247, // Dungeons (Lv. 70)    => Ala Mhigo
+                            085 => 676, // Dungeons (Lv. 71-79) => Holminster Switch
+                            086 => 652, // Dungeons (Lv. 80)    => Amaurot
+                            108 => 783, // Dungeons (Lv. 81-89) => Tower of Zot
+                            109 => 792, // Dungeons (Lv. 90)    => Dead Ends
                             046 => 000, // Maps
-                            052 => 000, // The Feast (doesn't work)
                             053 => 000, // PotD/HoH
-                            054 => 127, // Frontline: Borderland Ruins
-                            067 => 277, // Rival Wings: Astralagos
-                            // 6.1
+                            052 => 862, // Crystalline Conflict => Crystalline Conflict (Custom Match - The Palaistra)
+                            054 => 127, // Frontline            => Frontline: Borderland Ruins
+                            067 => 277, // Rival Wings          => Rival Wings: Astralagos
                             121 => 093, // Binding Coil of Bahamut
                             122 => 098, // Second Coil of Bahamut
                             123 => 107, // Final Coil of Bahamut
@@ -205,7 +205,6 @@ namespace WondrousTailsSolver
                             127 => 252, // Omega: Deltascape
                             128 => 286, // Omega: Sigmascape
                             129 => 587, // Omega: Alphascape
-
                             _ => 0,
                         };
 
@@ -399,13 +398,8 @@ namespace WondrousTailsSolver
         private void OpenRegularDuty(uint contentFinderCondition)
         {
             var agent = this.GetAgentContentsFinder();
+            PluginLog.Debug($"OpenRegularDuty 0x{(IntPtr)agent:X} #{contentFinderCondition}");
             this.openRegularDuty(agent, contentFinderCondition, 0);
-        }
-
-        private void OpenRouletteDuty(byte roulette)
-        {
-            var agent = this.GetAgentContentsFinder();
-            this.openRouletteDuty(agent, roulette, 0);
         }
 
         [StructLayout(LayoutKind.Explicit)]
