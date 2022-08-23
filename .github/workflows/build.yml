@@ -16,3 +16,5 @@ jobs:
       with: 
         token: ${{ secrets.PAT }}
         plugin_name: WondrousTailsSolver
+        project_path: WondrousTailsSolver
+        plugin_owners: daemitus
