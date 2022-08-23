@@ -88,7 +88,7 @@ namespace WondrousTailsSolver
             {
                 var addon = (AddonWeeklyBingo*)addonPtr;
 
-                if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
+                if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
                 {
                     PluginLog.Debug("Addon not ready yet");
                     this.lastCalculatedChancesSeString = null;
