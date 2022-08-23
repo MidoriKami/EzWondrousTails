@@ -48,7 +48,9 @@ namespace WondrousTailsSolver
         [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
         private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
 
-        private readonly Hook<AddonUpdateDelegate> addonUpdateHook;
+        [Signature("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??", DetourName = nameof(AddonUpdateDetour))]
+        private readonly Hook<AddonUpdateDelegate> addonUpdateHook = null!;
+
         private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
 
         private SeString? lastCalculatedChancesSeString;
@@ -63,11 +65,6 @@ namespace WondrousTailsSolver
 
             FFXIVClientStructs.Resolver.Initialize();
             SignatureHelper.Initialise(this, true);
-
-            var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
-
-            this.addonUpdateHook = new(addonUpdatePtr, this.AddonUpdateDetour);
-            this.addonUpdateHook.Enable();
         }
 
         private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
@@ -80,7 +77,6 @@ namespace WondrousTailsSolver
         /// <inheritdoc/>
         public void Dispose()
         {
-            this.addonUpdateHook?.Dispose();
             this.addonDutyReceiveEventHook?.Dispose();
         }
 
@@ -102,7 +98,7 @@ namespace WondrousTailsSolver
                 if (this.addonDutyReceiveEventHook == null)
                 {
                     var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
-                    this.addonDutyReceiveEventHook = new Hook<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+                    this.addonDutyReceiveEventHook = Hook<DutyReceiveEventDelegate>.FromAddress(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
                     this.addonDutyReceiveEventHook.Enable();
                 }
 
