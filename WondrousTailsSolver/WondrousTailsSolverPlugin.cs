@@ -48,7 +48,6 @@ namespace WondrousTailsSolver
         [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
         private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
 
-        [Signature("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??", DetourName = nameof(AddonUpdateDetour))]
         private readonly Hook<AddonUpdateDelegate> addonUpdateHook = null!;
 
         private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
@@ -63,8 +62,9 @@ namespace WondrousTailsSolver
         {
             pluginInterface.Create<Service>();
 
-            FFXIVClientStructs.Resolver.Initialize();
-            SignatureHelper.Initialise(this, true);
+            var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
+            this.addonUpdateHook = Hook<AddonUpdateDelegate>.FromAddress(addonUpdatePtr, this.AddonUpdateDetour);
+            this.addonUpdateHook.Enable();
         }
 
         private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
@@ -77,6 +77,7 @@ namespace WondrousTailsSolver
         /// <inheritdoc/>
         public void Dispose()
         {
+            this.addonUpdateHook?.Dispose();
             this.addonDutyReceiveEventHook?.Dispose();
         }
 
