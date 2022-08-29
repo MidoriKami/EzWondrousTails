@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -146,6 +147,21 @@ namespace WondrousTailsSolver
                     {
                         existingSeString.Append(this.lastCalculatedChancesSeString);
                         textNode->SetText(existingSeString.Encode());
+                    }
+                }
+
+                for (var i = 0; i < 16; ++i)
+                {
+                    var taskButtonState = wondrousTailsData->TaskStatus(i);
+                    var instances = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[i]);
+
+                    if (instances.Contains(Service.ClientState.TerritoryType))
+                    {
+                        SetDutySlotBorderColored(addon, i, new Vector4(255, 155, 155, 255));
+                    }
+                    else
+                    {
+                        ResetDutySlotBorder(addon, i, taskButtonState);
                     }
                 }
             }
@@ -399,48 +415,99 @@ namespace WondrousTailsSolver
             this.openRegularDuty(agent, contentFinderCondition, 0);
         }
 
+        // Color format is RGBA
+        private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
+        {
+            var node = GetBorderResourceNode(addon, slot);
+            if (node != null)
+            {
+                node->AtkResNode.ToggleVisibility(true);
+                node->AtkResNode.Color.R = (byte)color.X;
+                node->AtkResNode.Color.G = (byte)color.Y;
+                node->AtkResNode.Color.B = (byte)color.Z;
+                node->AtkResNode.Color.A = (byte)color.W;
+            }
+        }
+
+        private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, ButtonState taskState)
+        {
+            var node = GetBorderResourceNode(addon, slot);
+            if (node != null)
+            {
+                switch (taskState)
+                {
+                    case ButtonState.Completable:
+                        node->AtkResNode.ToggleVisibility(false);
+                        break;
+
+                    case ButtonState.AvailableNow:
+                        node->AtkResNode.ToggleVisibility(true);
+                        break;
+
+                    case ButtonState.Unavailable:
+                        node->AtkResNode.ToggleVisibility(false);
+                        break;
+                }
+
+                // Default Color
+                node->AtkResNode.Color.R = 0xFF;
+                node->AtkResNode.Color.G = 0xFF;
+                node->AtkResNode.Color.B = 0xFF;
+                node->AtkResNode.Color.A = 0xAD;
+            }
+        }
+
+        private static AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
+        {
+            var baseComponent = addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase;
+            var nineGridNode = GetNodeByID<AtkNineGridNode>(baseComponent, 11);
+
+            return nineGridNode;
+        }
+
+        private static T* GetNodeByID<T>(AtkComponentBase componentBase, uint nodeID, NodeType? type = null) where T : unmanaged
+        {
+            return GetNodeByID<T>(componentBase.UldManager, nodeID, type);
+        }
+
+        private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged 
+        {
+            for (var i = 0; i < uldManager.NodeListCount; i++) 
+            {
+                var n = uldManager.NodeList[i];
+                if (n->NodeID != nodeId || type != null && n->Type != type.Value) continue;
+                return (T*)n;
+            }
+            return null;
+        }
+
         [StructLayout(LayoutKind.Explicit)]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Offset ordering")]
-        private struct WondrousTails
+        public unsafe struct WondrousTails
         {
             [FieldOffset(0x06)]
             public fixed byte Tasks[16];
 
             [FieldOffset(0x16)]
-            public uint Rewards;
+            public readonly uint Rewards;
 
             [FieldOffset(0x1A)]
-            private readonly ushort stickerBits;
+            private readonly ushort _stickers;
 
-            [FieldOffset(0x1E)]
-            public ushort WeeklyKey;
+            public int Stickers => 
+                BitOperations.PopCount(_stickers);
 
             [FieldOffset(0x20)]
-            private readonly ushort secondChanceBits;
+            private readonly ushort _secondChance;
 
-            [FieldOffset(0x22)]
-            private fixed byte taskStatus[4];
+            public int SecondChance => 
+                (_secondChance >> 7) & 0b1111;
 
-            public int Stickers
-                => CountSetBits(this.stickerBits);
-
-            public int SecondChance
-                => (this.secondChanceBits >> 7) & 0b1111;
+            [FieldOffset(0x22)] 
+            private fixed byte _taskStatus[4];
 
             public ButtonState TaskStatus(int idx)
-                => (ButtonState)((this.taskStatus[idx >> 2] >> ((idx & 0b11) * 2)) & 0b11);
-
-            private static int CountSetBits(int n)
-            {
-                int count = 0;
-                while (n > 0)
-                {
-                    count += n & 1;
-                    n >>= 1;
-                }
-
-                return count;
-            }
+                => (ButtonState) ((_taskStatus[idx >> 2] >> ((idx & 0b11) * 2)) & 0b11);
         }
     }
 }
