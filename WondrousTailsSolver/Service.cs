@@ -1,5 +1,6 @@
 using Dalamud.Data;
 using Dalamud.Game;
+using Dalamud.Game.ClientState;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 
@@ -27,5 +28,11 @@ namespace WondrousTailsSolver
         /// </summary>
         [PluginService]
         internal static SigScanner SigScanner { get; private set; } = null!;
+
+        /// <summary>
+        /// Gets the Dalamud Client State.
+        /// </summary>
+        [PluginService]
+        internal static ClientState ClientState { get; private set; } = null!;
     }
 }

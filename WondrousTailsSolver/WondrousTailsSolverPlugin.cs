@@ -149,6 +149,21 @@ namespace WondrousTailsSolver
                         textNode->SetText(existingSeString.Encode());
                     }
                 }
+
+                for (var i = 0; i < 16; ++i)
+                {
+                    var taskButtonState = wondrousTailsData->TaskStatus(i);
+                    var instances = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[i]);
+
+                    if (instances.Contains(Service.ClientState.TerritoryType))
+                    {
+                        SetDutySlotBorderColored(addon, i, new Vector4(255, 155, 155, 255));
+                    }
+                    else
+                    {
+                        ResetDutySlotBorder(addon, i, taskButtonState);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -398,6 +413,72 @@ namespace WondrousTailsSolver
             var agent = this.GetAgentContentsFinder();
             PluginLog.Debug($"OpenRegularDuty 0x{(IntPtr)agent:X} #{contentFinderCondition}");
             this.openRegularDuty(agent, contentFinderCondition, 0);
+        }
+
+        // Color format is RGBA
+        private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
+        {
+            var node = GetBorderResourceNode(addon, slot);
+            if (node != null)
+            {
+                node->AtkResNode.ToggleVisibility(true);
+                node->AtkResNode.Color.R = (byte)color.X;
+                node->AtkResNode.Color.G = (byte)color.Y;
+                node->AtkResNode.Color.B = (byte)color.Z;
+                node->AtkResNode.Color.A = (byte)color.W;
+            }
+        }
+
+        private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, ButtonState taskState)
+        {
+            var node = GetBorderResourceNode(addon, slot);
+            if (node != null)
+            {
+                switch (taskState)
+                {
+                    case ButtonState.Completable:
+                        node->AtkResNode.ToggleVisibility(false);
+                        break;
+
+                    case ButtonState.AvailableNow:
+                        node->AtkResNode.ToggleVisibility(true);
+                        break;
+
+                    case ButtonState.Unavailable:
+                        node->AtkResNode.ToggleVisibility(false);
+                        break;
+                }
+
+                // Default Color
+                node->AtkResNode.Color.R = 0xFF;
+                node->AtkResNode.Color.G = 0xFF;
+                node->AtkResNode.Color.B = 0xFF;
+                node->AtkResNode.Color.A = 0xAD;
+            }
+        }
+
+        private static AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
+        {
+            var baseComponent = addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase;
+            var nineGridNode = GetNodeByID<AtkNineGridNode>(baseComponent, 11);
+
+            return nineGridNode;
+        }
+
+        private static T* GetNodeByID<T>(AtkComponentBase componentBase, uint nodeID, NodeType? type = null) where T : unmanaged
+        {
+            return GetNodeByID<T>(componentBase.UldManager, nodeID, type);
+        }
+
+        private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged 
+        {
+            for (var i = 0; i < uldManager.NodeListCount; i++) 
+            {
+                var n = uldManager.NodeList[i];
+                if (n->NodeID != nodeId || type != null && n->Type != type.Value) continue;
+                return (T*)n;
+            }
+            return null;
         }
 
         [StructLayout(LayoutKind.Explicit)]
