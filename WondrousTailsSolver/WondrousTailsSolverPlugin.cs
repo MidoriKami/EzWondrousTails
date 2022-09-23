@@ -63,6 +63,8 @@ namespace WondrousTailsSolver
         {
             pluginInterface.Create<Service>();
 
+            SignatureHelper.Initialise(this);
+
             var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
             this.addonUpdateHook = Hook<AddonUpdateDelegate>.FromAddress(addonUpdatePtr, this.AddonUpdateDetour);
             this.addonUpdateHook.Enable();
