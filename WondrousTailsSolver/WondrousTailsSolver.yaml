@@ -1,8 +1,8 @@
-author: daemitus,
-name: ezWondrousTails,
-punchline: Adds row probabilities to the Wondrous Tails display.,
-description: This plugin prints the probability of getting a row in Wondrous Tails to the in-game display along with the average probability of what would happen if you shuffled.,
-repo_url: https://github.com/daemitus/WondrousTailsSolver,
-icon_url: https://raw.githubusercontent.com/daemitus/WondrousTailsSolver/master/res/icon.png,
+author: daemitus
+name: ezWondrousTails
+punchline: Adds row probabilities to the Wondrous Tails display.
+description: This plugin prints the probability of getting a row in Wondrous Tails to the in-game display along with the average probability of what would happen if you shuffled.
+repo_url: https://github.com/daemitus/WondrousTailsSolver
+icon_url: https://raw.githubusercontent.com/daemitus/WondrousTailsSolver/master/res/icon.png
 image_urls:
 - https://raw.githubusercontent.com/daemitus/WondrousTailsSolver/master/res/image1.png
