@@ -43,12 +43,6 @@ namespace WondrousTailsSolver
         [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
         private readonly WondrousTails* wondrousTailsData = null!;
 
-        [Signature("48 89 6C 24 ?? 48 89 74 24 ?? 57 48 81 EC ?? ?? ?? ?? 48 8B F9 41 0F B6 E8")]
-        private readonly delegate* unmanaged<AgentInterface*, uint, byte, IntPtr> openRegularDuty = null!;
-
-        [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
-        private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
-
         private readonly Hook<AddonUpdateDelegate> addonUpdateHook = null!;
 
         private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
@@ -402,19 +396,9 @@ namespace WondrousTailsSolver
             return seString;
         }
 
-        private AgentInterface* GetAgentContentsFinder()
-        {
-            var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-            var uiModule = framework->GetUiModule();
-            var agentModule = uiModule->GetAgentModule();
-            return agentModule->GetAgentByInternalId(AgentId.ContentsFinder);
-        }
-
         private void OpenRegularDuty(uint contentFinderCondition)
         {
-            var agent = this.GetAgentContentsFinder();
-            PluginLog.Debug($"OpenRegularDuty 0x{(IntPtr)agent:X} #{contentFinderCondition}");
-            this.openRegularDuty(agent, contentFinderCondition, 0);
+            AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
         }
 
         // Color format is RGBA
