@@ -44,22 +44,12 @@ public static class TaskLookup
 
             // Level Range Dungeon
             case 2:
-                return bingoOrderData.Data switch
-                {
-                    // Level 1 - 50
-                    50 => Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-                        .Where(m => m.ContentType.Row is 2)
-                        .Where(m => m.ClassJobLevelRequired is >= 1 and <= 49)
-                        .Select(m => m.TerritoryType.Row)
-                        .ToList(),
-
-                    // Level (x - 9) - (x - 1) :: Example => 60 becomes 51 - 59
-                    _ => Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-                        .Where(m => m.ContentType.Row is 2)
-                        .Where(m => m.ClassJobLevelRequired >= bingoOrderData.Data - 9 && m.ClassJobLevelRequired <= bingoOrderData.Data - 1)
-                        .Select(m => m.TerritoryType.Row)
-                        .ToList(),
-                };
+                return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
+                    .Where(m => m.ContentType.Row is 2)
+                    .Where(m => m.ClassJobLevelRequired >= bingoOrderData.Data - (bingoOrderData.Data > 50 ? 9 : 49) && m.ClassJobLevelRequired <= bingoOrderData.Data - 1)
+                    .OrderBy(c => c.SortKey)
+                    .Select(m => m.TerritoryType.Row)
+                    .ToList();
 
             // Special categories
             case 3:
