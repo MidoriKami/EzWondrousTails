@@ -29,6 +29,7 @@ public static class TaskLookup
             case 0:
                 return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
                     .Where(c => c.Content == bingoOrderData.Data)
+                    .OrderBy(c => c.SortKey)
                     .Select(c => c.TerritoryType.Row)
                     .ToList();
 
@@ -37,6 +38,7 @@ public static class TaskLookup
                 return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
                     .Where(m => m.ContentType.Row is 2)
                     .Where(m => m.ClassJobLevelRequired == bingoOrderData.Data)
+                    .OrderBy(c => c.SortKey)
                     .Select(m => m.TerritoryType.Row)
                     .ToList();
 
@@ -72,6 +74,7 @@ public static class TaskLookup
                     // Deep Dungeons
                     3 => Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
                         .Where(m => m.ContentType.Row is 21)
+                        .OrderBy(c => c.SortKey)
                         .Select(m => m.TerritoryType.Row)
                         .ToList(),
 
@@ -80,6 +83,8 @@ public static class TaskLookup
 
             // Multi-instance raids
             case 4:
+                var raidIndex = (int)(bingoOrderData.Data - 11) * 2;
+
                 return bingoOrderData.Data switch
                 {
                     // Binding Coil, Second Coil, Final Coil
@@ -104,7 +109,7 @@ public static class TaskLookup
                         .Where(row => row.ItemLevelRequired >= 425)
                         .OrderBy(row => row.SortKey)
                         .Select(row => row.TerritoryType.Row)
-                        .ToArray()[(int)(-11 + bingoOrderData.Data)..(int)(-10 + bingoOrderData.Data)]
+                        .ToArray()[raidIndex..(raidIndex + 2)]
                         .ToList(),
 
                     _ => new List<uint>(),
