@@ -43,12 +43,6 @@ namespace WondrousTailsSolver
         [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
         private readonly WondrousTails* wondrousTailsData = null!;
 
-        [Signature("48 89 6C 24 ?? 48 89 74 24 ?? 57 48 81 EC ?? ?? ?? ?? 48 8B F9 41 0F B6 E8")]
-        private readonly delegate* unmanaged<AgentInterface*, uint, byte, IntPtr> openRegularDuty = null!;
-
-        [Signature("E9 ?? ?? ?? ?? 8B 93 ?? ?? ?? ?? 48 83 C4 20")]
-        private readonly delegate* unmanaged<AgentInterface*, byte, byte, IntPtr> openRouletteDuty = null!;
-
         private readonly Hook<AddonUpdateDelegate> addonUpdateHook = null!;
 
         private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
@@ -183,62 +177,16 @@ namespace WondrousTailsSolver
                     return;
 
                 var duty = (DutySlot*)dutyPtr;
-                var status = this.wondrousTailsData->TaskStatus(duty->index);
-                if (status == ButtonState.Completable)
-                {
-                    var orderDataID = this.wondrousTailsData->Tasks[duty->index];
-                    var orderDataSheet = Service.DataManager.GetExcelSheet<Sheets.WeeklyBingoOrderData>()!;
-                    var orderDataRow = orderDataSheet.GetRow(orderDataID)!;
+                var dutiesForTask = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[duty->index]);
 
-                    var contentID = orderDataRow.Data;
-                    if (contentID < 1000)
-                    {
-                        uint cfcID = orderDataID switch
-                        {
-                            // CFC => WBO
-                            001 => 004, // Dungeons (Lv. 1-49)  => Sastasha
-                            002 => 010, // Dungeons (Lv. 50)    => Wanderer's Palace
-                            003 => 036, // Dungeons (Lv. 51-59) => Dusk Vigil
-                            004 => 038, // Dungeons (Lv. 60)    => Aetherochemical Research Facility
-                            059 => 238, // Dungeons (Lv. 61-69) => Sirensong Sea
-                            060 => 247, // Dungeons (Lv. 70)    => Ala Mhigo
-                            085 => 676, // Dungeons (Lv. 71-79) => Holminster Switch
-                            086 => 652, // Dungeons (Lv. 80)    => Amaurot
-                            108 => 783, // Dungeons (Lv. 81-89) => Tower of Zot
-                            109 => 792, // Dungeons (Lv. 90)    => Dead Ends
-                            046 => 000, // Maps
-                            053 => 000, // PotD/HoH
-                            052 => 862, // Crystalline Conflict => Crystalline Conflict (Custom Match - The Palaistra)
-                            054 => 127, // Frontline            => Frontline: Borderland Ruins
-                            067 => 277, // Rival Wings          => Rival Wings: Astralagos
-                            121 => 093, // Binding Coil of Bahamut
-                            122 => 098, // Second Coil of Bahamut
-                            123 => 107, // Final Coil of Bahamut
-                            124 => 112, // Alexander: Gordias
-                            125 => 136, // Alexander: Midas
-                            126 => 186, // Alexander: The Creator
-                            127 => 252, // Omega: Deltascape
-                            128 => 286, // Omega: Sigmascape
-                            129 => 587, // Omega: Alphascape
-                            _ => 0,
-                        };
+                var territoryType = dutiesForTask.FirstOrDefault();
+                var cfc = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!
+                    .FirstOrDefault(cfc => cfc.TerritoryType.Row == territoryType);
 
-                        if (cfcID == 0)
-                            return;
+                if (cfc == null)
+                    return;
 
-                        this.OpenRegularDuty(cfcID);
-                    }
-                    else
-                    {
-                        var cfcSheet = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!;
-                        var contents = cfcSheet.FirstOrDefault(row => row.Content == contentID);
-                        if (contents == default)
-                            return;
-
-                        var cfcID = contents.RowId;
-                        this.OpenRegularDuty(cfcID);
-                    }
-                }
+                this.OpenRegularDuty(cfc.RowId);
             }
             catch (Exception ex)
             {
@@ -402,19 +350,9 @@ namespace WondrousTailsSolver
             return seString;
         }
 
-        private AgentInterface* GetAgentContentsFinder()
-        {
-            var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-            var uiModule = framework->GetUiModule();
-            var agentModule = uiModule->GetAgentModule();
-            return agentModule->GetAgentByInternalId(AgentId.ContentsFinder);
-        }
-
         private void OpenRegularDuty(uint contentFinderCondition)
         {
-            var agent = this.GetAgentContentsFinder();
-            PluginLog.Debug($"OpenRegularDuty 0x{(IntPtr)agent:X} #{contentFinderCondition}");
-            this.openRegularDuty(agent, contentFinderCondition, 0);
+            AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
         }
 
         // Color format is RGBA
