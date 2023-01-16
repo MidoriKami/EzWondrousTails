@@ -1,6 +1,7 @@
 using Dalamud.Data;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 
@@ -34,5 +35,11 @@ namespace WondrousTailsSolver
         /// </summary>
         [PluginService]
         internal static ClientState ClientState { get; private set; } = null!;
+
+        /// <summary>
+        /// Gets the Dalamud Condition class.
+        /// </summary>
+        [PluginService]
+        internal static Condition Condition { get; private set; } = null!;
     }
 }
