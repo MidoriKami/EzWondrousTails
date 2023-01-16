@@ -177,16 +177,20 @@ namespace WondrousTailsSolver
                     return;
 
                 var duty = (DutySlot*)dutyPtr;
-                var dutiesForTask = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[duty->index]);
+                var status = this.wondrousTailsData->TaskStatus(duty->index);
+                if (status is ButtonState.Completable)
+                {
+                    var dutiesForTask = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[duty->index]);
 
-                var territoryType = dutiesForTask.FirstOrDefault();
-                var cfc = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!
-                    .FirstOrDefault(cfc => cfc.TerritoryType.Row == territoryType);
+                    var territoryType = dutiesForTask.FirstOrDefault();
+                    var cfc = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!
+                        .FirstOrDefault(cfc => cfc.TerritoryType.Row == territoryType);
 
-                if (cfc == null)
-                    return;
+                    if (cfc == null)
+                        return;
 
-                this.OpenRegularDuty(cfc.RowId);
+                    this.OpenRegularDuty(cfc.RowId);
+                }
             }
             catch (Exception ex)
             {
