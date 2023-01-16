@@ -4,7 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
-
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
@@ -173,6 +173,9 @@ namespace WondrousTailsSolver
 
             try
             {
+                // Checks if the player is in a duty, excluding IslandSanctuary
+                if (IsBoundByDuty()) return;
+
                 if (this.wondrousTailsData == null)
                     return;
 
@@ -357,6 +360,24 @@ namespace WondrousTailsSolver
         private void OpenRegularDuty(uint contentFinderCondition)
         {
             AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
+        }
+
+        public static bool IsBoundByDuty()
+        {
+            if (IsInIslandSanctuary()) return false;
+
+            return Service.Condition[ConditionFlag.BoundByDuty] ||
+                   Service.Condition[ConditionFlag.BoundByDuty56] ||
+                   Service.Condition[ConditionFlag.BoundByDuty95];
+        }
+
+        public static bool IsInIslandSanctuary()
+        {
+            var territoryInfo = Service.DataManager.GetExcelSheet<Sheets.TerritoryType>()!.GetRow(Service.ClientState.TerritoryType);
+            if (territoryInfo is null) return false;
+
+            // Island Sanctuary
+            return territoryInfo.TerritoryIntendedUse == 49;
         }
 
         // Color format is RGBA
