@@ -106,7 +106,7 @@ public static class TaskLookup
                 };
         }
 
-        PluginLog.Information($"[WondrousTails] Unrecognized ID: {id}");
+        Service.PluginLog.Information($"[WondrousTails] Unrecognized ID: {id}");
         return new List<uint>();
     }
 }

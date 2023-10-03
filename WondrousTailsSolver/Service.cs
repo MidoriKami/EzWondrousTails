@@ -1,9 +1,7 @@
-using Dalamud.Data;
 using Dalamud.Game;
-using Dalamud.Game.ClientState;
-using Dalamud.Game.ClientState.Conditions;
 using Dalamud.IoC;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 
 namespace WondrousTailsSolver
 {
@@ -22,24 +20,36 @@ namespace WondrousTailsSolver
         /// Gets the Dalamud data manager.
         /// </summary>
         [PluginService]
-        internal static DataManager DataManager { get; private set; } = null!;
+        internal static IDataManager DataManager { get; private set; } = null!;
 
         /// <summary>
         /// Gets the Dalamud signature scanner.
         /// </summary>
         [PluginService]
-        internal static SigScanner SigScanner { get; private set; } = null!;
+        internal static ISigScanner SigScanner { get; private set; } = null!;
 
         /// <summary>
         /// Gets the Dalamud Client State.
         /// </summary>
         [PluginService]
-        internal static ClientState ClientState { get; private set; } = null!;
+        internal static IClientState ClientState { get; private set; } = null!;
 
         /// <summary>
         /// Gets the Dalamud Condition class.
         /// </summary>
         [PluginService]
-        internal static Condition Condition { get; private set; } = null!;
+        internal static ICondition Condition { get; private set; } = null!;
+
+        /// <summary>
+        /// Gets the Dalamud Hooker class.
+        /// </summary>
+        [PluginService]
+        internal static IGameInteropProvider Hooker { get; private set; } = null!;
+
+        /// <summary>
+        /// Gets the Dalamud Service.PluginLog class.
+        /// </summary>
+        [PluginService]
+        internal static IPluginLog PluginLog { get; private set; } = null!;
     }
 }

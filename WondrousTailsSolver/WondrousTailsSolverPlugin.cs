@@ -4,11 +4,11 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
-using Dalamud.Logging;
 using Dalamud.Plugin;
 using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -22,7 +22,7 @@ namespace WondrousTailsSolver
     /// <summary>
     /// Main plugin implementation.
     /// </summary>
-    public sealed unsafe partial class WondrousTailsSolverPlugin : IDalamudPlugin
+    public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     {
         private static readonly UIGlowPayload GoldenGlow = new(2);
         private static readonly UIForegroundPayload SecretDelimiter = new(51);
@@ -57,19 +57,16 @@ namespace WondrousTailsSolver
         {
             pluginInterface.Create<Service>();
 
-            SignatureHelper.Initialise(this);
+            Service.Hooker.InitializeFromAttributes(this);
 
             var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
-            this.addonUpdateHook = Hook<AddonUpdateDelegate>.FromAddress(addonUpdatePtr, this.AddonUpdateDetour);
+            this.addonUpdateHook = Service.Hooker.HookFromAddress<AddonUpdateDelegate>(addonUpdatePtr, this.AddonUpdateDetour);
             this.addonUpdateHook.Enable();
         }
 
         private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
 
         private delegate void DutyReceiveEventDelegate(IntPtr addonPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5);
-
-        /// <inheritdoc/>
-        public string Name => "ezWondrousTails";
 
         /// <inheritdoc/>
         public void Dispose()
@@ -88,7 +85,7 @@ namespace WondrousTailsSolver
 
                 if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
                 {
-                    PluginLog.Debug("Addon not ready yet");
+                    Service.PluginLog.Debug("Addon not ready yet");
                     this.lastCalculatedChancesSeString = null;
                     return;
                 }
@@ -96,7 +93,7 @@ namespace WondrousTailsSolver
                 if (this.addonDutyReceiveEventHook == null)
                 {
                     var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
-                    this.addonDutyReceiveEventHook = Hook<DutyReceiveEventDelegate>.FromAddress(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+                    this.addonDutyReceiveEventHook = Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
                     this.addonDutyReceiveEventHook.Enable();
                 }
 
@@ -119,7 +116,7 @@ namespace WondrousTailsSolver
                         if ((i + 1) % 4 == 0) sb.Append(' ');
                     }
 
-                    PluginLog.Debug($"State has changed: {sb}");
+                    Service.PluginLog.Debug($"State has changed: {sb}");
 
                     var textNode = addon->StringThing.TextNode;
                     var existingBytes = this.ReadSeStringBytes(textNode);
@@ -163,7 +160,7 @@ namespace WondrousTailsSolver
             }
             catch (Exception ex)
             {
-                PluginLog.Error(ex, "Boom");
+                Service.PluginLog.Error(ex, "Boom");
             }
         }
 
@@ -197,7 +194,7 @@ namespace WondrousTailsSolver
             }
             catch (Exception ex)
             {
-                PluginLog.Error(ex, "Boom");
+                Service.PluginLog.Error(ex, "Boom");
             }
         }
 
@@ -350,7 +347,7 @@ namespace WondrousTailsSolver
                 }
                 catch (ArgumentException)
                 {
-                    PluginLog.Warning($"ArgExc during RemoveProbabilityString, count={seString.Payloads.Count} index={index} removeCount={removeCount}");
+                    Service.PluginLog.Warning($"ArgExc during RemoveProbabilityString, count={seString.Payloads.Count} index={index} removeCount={removeCount}");
                 }
             }
 
