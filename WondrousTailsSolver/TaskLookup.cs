@@ -2,19 +2,18 @@
 using System.Linq;
 
 using Dalamud;
-using Dalamud.Logging;
 using Dalamud.Utility;
 using Lumina.Excel.GeneratedSheets;
 
 namespace WondrousTailsSolver;
 
 /// <summary>
-/// Helper class for converting Task ID's into Zone Lists
+/// Helper class for converting Task ID's into Zone Lists.
 /// </summary>
 public static class TaskLookup
 {
     /// <summary>
-    /// Processes Wondrous Tails TaskID into a list of zones
+    /// Processes Wondrous Tails TaskID into a list of zones.
     /// </summary>
     /// <param name="id">Wondrous Tails TaskID.</param>
     /// <returns>List of TerritoryType row Id's.</returns>
@@ -84,7 +83,7 @@ public static class TaskLookup
 
                     // Gordias, Midas, The Creator
                     5 => new List<uint> { 442, 443, 444, 445 },
-                    6 => new List<uint> {520, 521, 522, 523},
+                    6 => new List<uint> { 520, 521, 522, 523 },
                     7 => new List<uint> { 580, 581, 582, 583 },
 
                     // Deltascape, Sigmascape, Alphascape

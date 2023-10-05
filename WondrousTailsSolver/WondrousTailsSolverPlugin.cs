@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using System.Text;
 
 using Dalamud.Game.Addon.Lifecycle;
@@ -65,6 +64,91 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         Service.AddonLifecycle.UnregisterListener(this.AddonUpdateDetour);
 
         this.addonDutyReceiveEventHook?.Dispose();
+    }
+
+    private static bool IsBoundByDuty()
+    {
+        if (IsInIslandSanctuary()) return false;
+
+        return Service.Condition[ConditionFlag.BoundByDuty] ||
+               Service.Condition[ConditionFlag.BoundByDuty56] ||
+               Service.Condition[ConditionFlag.BoundByDuty95];
+    }
+
+    private static bool IsInIslandSanctuary()
+    {
+        var territoryInfo = Service.DataManager.GetExcelSheet<Sheets.TerritoryType>()!.GetRow(Service.ClientState.TerritoryType);
+        if (territoryInfo is null) return false;
+
+        // Island Sanctuary
+        return territoryInfo.TerritoryIntendedUse == 49;
+    }
+
+    // Color format is RGBA
+    private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
+    {
+        var node = GetBorderResourceNode(addon, slot);
+        if (node != null)
+        {
+            node->AtkResNode.ToggleVisibility(true);
+            node->AtkResNode.Color.R = (byte)color.X;
+            node->AtkResNode.Color.G = (byte)color.Y;
+            node->AtkResNode.Color.B = (byte)color.Z;
+            node->AtkResNode.Color.A = (byte)color.W;
+        }
+    }
+
+    private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
+    {
+        var node = GetBorderResourceNode(addon, slot);
+        if (node != null)
+        {
+            switch (taskState)
+            {
+                case PlayerState.WeeklyBingoTaskStatus.Open:
+                    node->AtkResNode.ToggleVisibility(false);
+                    break;
+
+                case PlayerState.WeeklyBingoTaskStatus.Claimable:
+                    node->AtkResNode.ToggleVisibility(true);
+                    break;
+
+                case PlayerState.WeeklyBingoTaskStatus.Claimed:
+                    node->AtkResNode.ToggleVisibility(false);
+                    break;
+            }
+
+            // Default Color
+            node->AtkResNode.Color.R = 0xFF;
+            node->AtkResNode.Color.G = 0xFF;
+            node->AtkResNode.Color.B = 0xFF;
+            node->AtkResNode.Color.A = 0xAD;
+        }
+    }
+
+    private static AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
+    {
+        var baseComponent = addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase;
+        var nineGridNode = GetNodeByID<AtkNineGridNode>(baseComponent, 11);
+
+        return nineGridNode;
+    }
+
+    private static T* GetNodeByID<T>(AtkComponentBase componentBase, uint nodeID, NodeType? type = null) where T : unmanaged
+    {
+        return GetNodeByID<T>(componentBase.UldManager, nodeID, type);
+    }
+
+    private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged
+    {
+        for (var i = 0; i < uldManager.NodeListCount; i++)
+        {
+            var n = uldManager.NodeList[i];
+            if (n->NodeID != nodeId || (type != null && n->Type != type.Value)) continue;
+            return (T*)n;
+        }
+
+        return null;
     }
 
     private void AddonUpdateDetour(AddonEvent type, AddonArgs args)
@@ -239,7 +323,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                 {
                     const double bound = 0.05;
                     var sampleBoundLower = Math.Max(0, sample - bound);
-                    var sampleBoundUpper = Math.Min(1, sample + bound);
+                    // var sampleBoundUpper = Math.Min(1, sample + bound);
 
                     if (Math.Abs(value - 1) < 0.1f)
                     {
@@ -330,90 +414,5 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     private void OpenRegularDuty(uint contentFinderCondition)
     {
         AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
-    }
-
-    private static bool IsBoundByDuty()
-    {
-        if (IsInIslandSanctuary()) return false;
-
-        return Service.Condition[ConditionFlag.BoundByDuty] ||
-               Service.Condition[ConditionFlag.BoundByDuty56] ||
-               Service.Condition[ConditionFlag.BoundByDuty95];
-    }
-
-    private static bool IsInIslandSanctuary()
-    {
-        var territoryInfo = Service.DataManager.GetExcelSheet<Sheets.TerritoryType>()!.GetRow(Service.ClientState.TerritoryType);
-        if (territoryInfo is null) return false;
-
-        // Island Sanctuary
-        return territoryInfo.TerritoryIntendedUse == 49;
-    }
-
-    // Color format is RGBA
-    private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
-    {
-        var node = GetBorderResourceNode(addon, slot);
-        if (node != null)
-        {
-            node->AtkResNode.ToggleVisibility(true);
-            node->AtkResNode.Color.R = (byte)color.X;
-            node->AtkResNode.Color.G = (byte)color.Y;
-            node->AtkResNode.Color.B = (byte)color.Z;
-            node->AtkResNode.Color.A = (byte)color.W;
-        }
-    }
-
-    private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
-    {
-        var node = GetBorderResourceNode(addon, slot);
-        if (node != null)
-        {
-            switch (taskState)
-            {
-                case PlayerState.WeeklyBingoTaskStatus.Open:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimable:
-                    node->AtkResNode.ToggleVisibility(true);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimed:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-            }
-
-            // Default Color
-            node->AtkResNode.Color.R = 0xFF;
-            node->AtkResNode.Color.G = 0xFF;
-            node->AtkResNode.Color.B = 0xFF;
-            node->AtkResNode.Color.A = 0xAD;
-        }
-    }
-
-    private static AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
-    {
-        var baseComponent = addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase;
-        var nineGridNode = GetNodeByID<AtkNineGridNode>(baseComponent, 11);
-
-        return nineGridNode;
-    }
-
-    private static T* GetNodeByID<T>(AtkComponentBase componentBase, uint nodeID, NodeType? type = null) where T : unmanaged
-    {
-        return GetNodeByID<T>(componentBase.UldManager, nodeID, type);
-    }
-
-    private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged
-    {
-        for (var i = 0; i < uldManager.NodeListCount; i++)
-        {
-            var n = uldManager.NodeList[i];
-            if (n->NodeID != nodeId || (type != null && n->Type != type.Value)) continue;
-            return (T*)n;
-        }
-
-        return null;
     }
 }

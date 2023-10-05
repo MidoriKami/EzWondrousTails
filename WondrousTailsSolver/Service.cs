@@ -1,4 +1,3 @@
-using Dalamud.Game;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -21,12 +20,6 @@ internal class Service
     /// </summary>
     [PluginService]
     internal static IDataManager DataManager { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud signature scanner.
-    /// </summary>
-    [PluginService]
-    internal static ISigScanner SigScanner { get; private set; } = null!;
 
     /// <summary>
     /// Gets the Dalamud Client State.
