@@ -5,6 +5,8 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
@@ -43,8 +45,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
     private readonly WondrousTails* wondrousTailsData = null!;
 
-    private readonly Hook<AddonUpdateDelegate> addonUpdateHook = null!;
-
     private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
 
     private SeString? lastCalculatedChancesSeString;
@@ -59,9 +59,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         Service.Hooker.InitializeFromAttributes(this);
 
-        var addonUpdatePtr = Service.SigScanner.ScanText("40 53 48 83 EC 30 F6 81 ?? ?? ?? ?? ?? 48 8B D9 0F 29 74 24 ?? 0F 28 F1 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 89 6C 24 ??");
-        this.addonUpdateHook = Service.Hooker.HookFromAddress<AddonUpdateDelegate>(addonUpdatePtr, this.AddonUpdateDetour);
-        this.addonUpdateHook.Enable();
+        Service.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, "WeeklyBingo", this.AddonUpdateDetour);
     }
 
     private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
@@ -71,96 +69,86 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     /// <inheritdoc/>
     public void Dispose()
     {
-        this.addonUpdateHook?.Dispose();
         this.addonDutyReceiveEventHook?.Dispose();
     }
 
-    private unsafe void AddonUpdateDetour(IntPtr addonPtr, float deltaLastUpdate)
+    private void AddonUpdateDetour(AddonEvent type, AddonArgs args)
     {
-        this.addonUpdateHook.Original(addonPtr, deltaLastUpdate);
+        var addon = (AddonWeeklyBingo*)args.Addon;
 
-        try
+        if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
         {
-            var addon = (AddonWeeklyBingo*)addonPtr;
+            Service.PluginLog.Verbose("Addon not ready yet");
+            this.lastCalculatedChancesSeString = null;
+            return;
+        }
 
-            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
+        if (this.addonDutyReceiveEventHook == null)
+        {
+            var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
+            this.addonDutyReceiveEventHook = Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+            this.addonDutyReceiveEventHook.Enable();
+        }
+
+        var stateChanged = this.UpdateGameState(addon);
+
+        if (stateChanged)
+        {
+            var placedStickers = this.gameState.Count(b => b);
+            if (placedStickers == 0 || placedStickers == 16 || placedStickers > 7)
             {
-                Service.PluginLog.Debug("Addon not ready yet");
+                // 0 and 16 are seen when the addon is loading. > 7 shuffling is disabled
                 this.lastCalculatedChancesSeString = null;
                 return;
             }
 
-            if (this.addonDutyReceiveEventHook == null)
+            var sb = new StringBuilder();
+            for (int i = 0; i < this.gameState.Length; i++)
             {
-                var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
-                this.addonDutyReceiveEventHook = Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
-                this.addonDutyReceiveEventHook.Enable();
+                sb.Append(this.gameState[i] ? "X" : "O");
+                if ((i + 1) % 4 == 0) sb.Append(' ');
             }
 
-            var stateChanged = this.UpdateGameState(addon);
+            Service.PluginLog.Debug($"State has changed: {sb}");
 
-            if (stateChanged)
+            var textNode = addon->StringThing.TextNode;
+            var existingBytes = this.ReadSeStringBytes(textNode);
+            var existingSeString = SeString.Parse(existingBytes);
+
+            this.RemoveProbabilityString(existingSeString);
+
+            var probString = this.lastCalculatedChancesSeString = this.SolveAndGetProbabilitySeString();
+            existingSeString.Append(probString);
+
+            textNode->SetText(existingSeString.Encode());
+        }
+        else if (this.lastCalculatedChancesSeString != null)
+        {
+            var textNode = addon->StringThing.TextNode;
+            var existingBytes = this.ReadSeStringBytes(textNode);
+            var existingSeString = SeString.Parse(existingBytes);
+
+            // Check for the Chances textPayload, if it doesn't exist we add the last known probString
+            if (!this.SeStringContainsProbabilityString(existingSeString))
             {
-                var placedStickers = this.gameState.Count(b => b);
-                if (placedStickers == 0 || placedStickers == 16 || placedStickers > 7)
-                {
-                    // 0 and 16 are seen when the addon is loading. > 7 shuffling is disabled
-                    this.lastCalculatedChancesSeString = null;
-                    return;
-                }
-
-                var sb = new StringBuilder();
-                for (int i = 0; i < this.gameState.Length; i++)
-                {
-                    sb.Append(this.gameState[i] ? "X" : "O");
-                    if ((i + 1) % 4 == 0) sb.Append(' ');
-                }
-
-                Service.PluginLog.Debug($"State has changed: {sb}");
-
-                var textNode = addon->StringThing.TextNode;
-                var existingBytes = this.ReadSeStringBytes(textNode);
-                var existingSeString = SeString.Parse(existingBytes);
-
-                this.RemoveProbabilityString(existingSeString);
-
-                var probString = this.lastCalculatedChancesSeString = this.SolveAndGetProbabilitySeString();
-                existingSeString.Append(probString);
-
+                existingSeString.Append(this.lastCalculatedChancesSeString);
                 textNode->SetText(existingSeString.Encode());
             }
-            else if (this.lastCalculatedChancesSeString != null)
-            {
-                var textNode = addon->StringThing.TextNode;
-                var existingBytes = this.ReadSeStringBytes(textNode);
-                var existingSeString = SeString.Parse(existingBytes);
-
-                // Check for the Chances textPayload, if it doesn't exist we add the last known probString
-                if (!this.SeStringContainsProbabilityString(existingSeString))
-                {
-                    existingSeString.Append(this.lastCalculatedChancesSeString);
-                    textNode->SetText(existingSeString.Encode());
-                }
-            }
-
-            for (var i = 0; i < 16; ++i)
-            {
-                var taskButtonState = wondrousTailsData->TaskStatus(i);
-                var instances = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[i]);
-
-                if (instances.Contains(Service.ClientState.TerritoryType))
-                {
-                    SetDutySlotBorderColored(addon, i, new Vector4(255, 155, 155, 255));
-                }
-                else
-                {
-                    ResetDutySlotBorder(addon, i, taskButtonState);
-                }
-            }
         }
-        catch (Exception ex)
+
+        for (var i = 0; i < 16; ++i)
         {
-            Service.PluginLog.Error(ex, "Boom");
+            var taskButtonState = wondrousTailsData->TaskStatus(i);
+            var instances = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[i]);
+
+            if (instances.Contains(Service.ClientState.TerritoryType))
+            {
+                SetDutySlotBorderColored(addon, i, new Vector4(255, 155, 155, 255));
+            }
+            else
+            {
+                ResetDutySlotBorder(addon, i, taskButtonState);
+            }
         }
     }
 
