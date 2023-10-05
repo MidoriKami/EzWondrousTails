@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
     <Version>2.3.0.1</Version>
-    <Authors>daemitus</Authors>
+    <Authors>daemitus,MidoriKami</Authors>
     <PackageProjectUrl>https://github.com/daemitus/WondrousTailsSolver</PackageProjectUrl>
   </PropertyGroup>
 
@@ -24,11 +24,6 @@
   <PropertyGroup Label="Documentation">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Content Include="..\res\icon.png" Link="images\icon.png" CopyToOutputDirectory="PreserveNewest" Visible="false" />
-    <Content Include="..\res\image1.png" Link="images\image1.png" CopyToOutputDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
 
   <PropertyGroup>
     <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
@@ -57,6 +52,11 @@
     <Reference Include="ImGui.NET" Private="False" />
     <Reference Include="Lumina" Private="False" />
     <Reference Include="Lumina.Excel" Private="False" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="packages.lock.json" />
+    <None Remove="WondrousTailsSolver.yaml" />
   </ItemGroup>
 </Project>
 

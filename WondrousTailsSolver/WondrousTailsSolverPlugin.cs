@@ -11,6 +11,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
+using Dalamud.Utility.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -53,7 +54,9 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     {
         pluginInterface.Create<Service>();
 
-        Service.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, "WeeklyBingo", this.AddonUpdateDetour);
+        Service.AddonLifecycle.RegisterListener(AddonEvent.PreDraw, "WeeklyBingo", this.AddonUpdateDetour);
+        Service.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "WeeklyBingo", this.AddonSetupDetour);
+        Service.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "WeeklyBingo", this.AddonFinalizeDetour);
     }
 
     private delegate void DutyReceiveEventDelegate(IntPtr addonPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5);
@@ -61,28 +64,15 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     /// <inheritdoc/>
     public void Dispose()
     {
-        Service.AddonLifecycle.UnregisterListener(this.AddonUpdateDetour);
+        Service.AddonLifecycle.UnregisterListener(this.AddonUpdateDetour, this.AddonSetupDetour);
 
         this.addonDutyReceiveEventHook?.Dispose();
     }
 
-    private static bool IsBoundByDuty()
-    {
-        if (IsInIslandSanctuary()) return false;
-
-        return Service.Condition[ConditionFlag.BoundByDuty] ||
-               Service.Condition[ConditionFlag.BoundByDuty56] ||
-               Service.Condition[ConditionFlag.BoundByDuty95];
-    }
-
-    private static bool IsInIslandSanctuary()
-    {
-        var territoryInfo = Service.DataManager.GetExcelSheet<Sheets.TerritoryType>()!.GetRow(Service.ClientState.TerritoryType);
-        if (territoryInfo is null) return false;
-
-        // Island Sanctuary
-        return territoryInfo.TerritoryIntendedUse == 49;
-    }
+    private static bool IsBoundByDuty() => Service.Condition.Any(
+        ConditionFlag.BoundByDuty,
+        ConditionFlag.BoundByDuty56,
+        ConditionFlag.BoundByDuty95);
 
     // Color format is RGBA
     private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
@@ -91,10 +81,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         if (node != null)
         {
             node->AtkResNode.ToggleVisibility(true);
-            node->AtkResNode.Color.R = (byte)color.X;
-            node->AtkResNode.Color.G = (byte)color.Y;
-            node->AtkResNode.Color.B = (byte)color.Z;
-            node->AtkResNode.Color.A = (byte)color.W;
+            node->AtkResNode.Color = color.ToByteColor();
         }
     }
 
@@ -119,10 +106,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             }
 
             // Default Color
-            node->AtkResNode.Color.R = 0xFF;
-            node->AtkResNode.Color.G = 0xFF;
-            node->AtkResNode.Color.B = 0xFF;
-            node->AtkResNode.Color.A = 0xAD;
+            node->AtkResNode.Color = new Vector4(1.0f, 1.0f, 1.0f, 0.678f).ToByteColor();
         }
     }
 
@@ -151,23 +135,18 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         return null;
     }
 
-    private void AddonUpdateDetour(AddonEvent type, AddonArgs args)
+    private void AddonSetupDetour(AddonEvent type, AddonArgs args)
     {
         var addon = (AddonWeeklyBingo*)args.Addon;
 
-        if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
-        {
-            Service.PluginLog.Verbose("Addon not ready yet");
-            this.lastCalculatedChancesSeString = null;
-            return;
-        }
+        var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
+        this.addonDutyReceiveEventHook ??= Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+        this.addonDutyReceiveEventHook?.Enable();
+    }
 
-        if (this.addonDutyReceiveEventHook == null)
-        {
-            var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
-            this.addonDutyReceiveEventHook = Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
-            this.addonDutyReceiveEventHook.Enable();
-        }
+    private void AddonUpdateDetour(AddonEvent type, AddonArgs args)
+    {
+        var addon = (AddonWeeklyBingo*)args.Addon;
 
         if (this.UpdateGameState(addon))
         {
@@ -220,13 +199,18 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
             if (instances.Contains(Service.ClientState.TerritoryType))
             {
-                SetDutySlotBorderColored(addon, i, new Vector4(255, 155, 155, 255));
+                SetDutySlotBorderColored(addon, i, new Vector4(1.0f, 0.607f, 0.607f, 1.0f));
             }
             else
             {
                 ResetDutySlotBorder(addon, i, taskButtonState);
             }
         }
+    }
+
+    private void AddonFinalizeDetour(AddonEvent type, AddonArgs args)
+    {
+        this.lastCalculatedChancesSeString = null;
     }
 
     private void AddonDutyReceiveEventDetour(IntPtr dutyPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5)
