@@ -45,7 +45,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
     private readonly WondrousTails* wondrousTailsData = null!;
 
-    private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook = null;
+    private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook;
 
     private SeString? lastCalculatedChancesSeString;
 
@@ -62,13 +62,13 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         Service.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, "WeeklyBingo", this.AddonUpdateDetour);
     }
 
-    private delegate void AddonUpdateDelegate(IntPtr addonPtr, float deltaLastUpdate);
-
     private delegate void DutyReceiveEventDelegate(IntPtr addonPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5);
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        Service.AddonLifecycle.UnregisterListener(this.AddonUpdateDetour);
+
         this.addonDutyReceiveEventHook?.Dispose();
     }
 
@@ -90,12 +90,10 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             this.addonDutyReceiveEventHook.Enable();
         }
 
-        var stateChanged = this.UpdateGameState(addon);
-
-        if (stateChanged)
+        if (this.UpdateGameState(addon))
         {
             var placedStickers = this.gameState.Count(b => b);
-            if (placedStickers == 0 || placedStickers == 16 || placedStickers > 7)
+            if (placedStickers is 0 or 16 or > 7)
             {
                 // 0 and 16 are seen when the addon is loading. > 7 shuffling is disabled
                 this.lastCalculatedChancesSeString = null;
@@ -103,7 +101,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             }
 
             var sb = new StringBuilder();
-            for (int i = 0; i < this.gameState.Length; i++)
+            for (var i = 0; i < this.gameState.Length; i++)
             {
                 sb.Append(this.gameState[i] ? "X" : "O");
                 if ((i + 1) % 4 == 0) sb.Append(' ');
@@ -186,7 +184,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
-    private unsafe bool UpdateGameState(AddonWeeklyBingo* addon)
+    private bool UpdateGameState(AddonWeeklyBingo* addon)
     {
         if (this.wondrousTailsData == null)
             return false;
@@ -209,12 +207,12 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
     private byte[] ReadSeStringBytes(AtkTextNode* node)
     {
-        var utf8str = &node->NodeText;
+        var utf8Str = &node->NodeText;
 
-        if (node == null || utf8str->StringPtr == null || utf8str->BufUsed <= 1)
+        if (node == null || utf8Str->StringPtr == null || utf8Str->BufUsed <= 1)
             return Array.Empty<byte>();
 
-        var span = new Span<byte>(utf8str->StringPtr, (int)(utf8str->BufUsed - 1));
+        var span = new Span<byte>(utf8Str->StringPtr, (int)(utf8Str->BufUsed - 1));
         return span.ToArray();
     }
 
@@ -226,7 +224,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         var values = this.perfectTails.Solve(this.gameState);
 
         double[]? samples = null;
-        if (stickersPlaced > 0 && stickersPlaced <= 7)
+        if (stickersPlaced is > 0 and <= 7)
             samples = this.perfectTails.GetSample(stickersPlaced);
 
         if (values == PerfectTails.Error)
@@ -250,11 +248,11 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             {
                 foreach (var (value, sample, valuePayload) in Enumerable.Range(0, values.Length).Select(i => (values[i], samples[i], valuePayloads[i])))
                 {
-                    var bound = 0.05;
+                    const double bound = 0.05;
                     var sampleBoundLower = Math.Max(0, sample - bound);
                     var sampleBoundUpper = Math.Min(1, sample + bound);
 
-                    if (value == 1)
+                    if (Math.Abs(value - 1) < 0.1f)
                     {
                         seString.Append(GoldenGlow).Append(valuePayload).Append(GlowOff);
                     }
@@ -276,7 +274,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                     }
                     else
                     {
-                        // Just incase
+                        // Just in case
                         seString.Append(valuePayload);
                     }
 
@@ -298,7 +296,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
-    private TextPayload[] StringFormatDoubles(double[] values)
+    private TextPayload[] StringFormatDoubles(IEnumerable<double> values)
         => values.Select(v => new TextPayload($"{v * 100:F2}%")).ToArray();
 
     private bool SeStringTryFindDelimiter(SeString seString, out int index)
@@ -309,7 +307,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             var payload = seString.Payloads[i];
             if (payload is UIForegroundPayload)
             {
-                if (Enumerable.SequenceEqual(payload.Encode(), secretBytes))
+                if (payload.Encode().SequenceEqual(secretBytes))
                 {
                     index = i;
                     return true;
@@ -322,9 +320,9 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     }
 
     private bool SeStringContainsProbabilityString(SeString seString)
-        => this.SeStringTryFindDelimiter(seString, out var _);
+        => this.SeStringTryFindDelimiter(seString, out _);
 
-    private SeString RemoveProbabilityString(SeString seString)
+    private void RemoveProbabilityString(SeString seString)
     {
         if (this.SeStringTryFindDelimiter(seString, out var index))
         {
@@ -338,8 +336,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                 Service.PluginLog.Warning($"ArgExc during RemoveProbabilityString, count={seString.Payloads.Count} index={index} removeCount={removeCount}");
             }
         }
-
-        return seString;
     }
 
     private void OpenRegularDuty(uint contentFinderCondition)
@@ -347,7 +343,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
     }
 
-    public static bool IsBoundByDuty()
+    private static bool IsBoundByDuty()
     {
         if (IsInIslandSanctuary()) return false;
 
@@ -356,7 +352,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                Service.Condition[ConditionFlag.BoundByDuty95];
     }
 
-    public static bool IsInIslandSanctuary()
+    private static bool IsInIslandSanctuary()
     {
         var territoryInfo = Service.DataManager.GetExcelSheet<Sheets.TerritoryType>()!.GetRow(Service.ClientState.TerritoryType);
         if (territoryInfo is null) return false;
@@ -420,9 +416,9 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         return GetNodeByID<T>(componentBase.UldManager, nodeID, type);
     }
 
-    private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged 
+    private static T* GetNodeByID<T>(AtkUldManager uldManager, uint nodeId, NodeType? type = null) where T : unmanaged
     {
-        for (var i = 0; i < uldManager.NodeListCount; i++) 
+        for (var i = 0; i < uldManager.NodeListCount; i++)
         {
             var n = uldManager.NodeList[i];
             if (n->NodeID != nodeId || type != null && n->Type != type.Value) continue;
