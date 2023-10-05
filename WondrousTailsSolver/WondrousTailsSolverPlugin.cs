@@ -12,7 +12,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
-using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -42,9 +42,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     private readonly PerfectTails perfectTails = new();
     private readonly bool[] gameState = new bool[16];
 
-    [Signature("88 05 ?? ?? ?? ?? 8B 43 18", ScanType = ScanType.StaticAddress)]
-    private readonly WondrousTails* wondrousTailsData = null!;
-
     private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook;
 
     private SeString? lastCalculatedChancesSeString;
@@ -56,8 +53,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     public WondrousTailsSolverPlugin(DalamudPluginInterface pluginInterface)
     {
         pluginInterface.Create<Service>();
-
-        Service.Hooker.InitializeFromAttributes(this);
 
         Service.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, "WeeklyBingo", this.AddonUpdateDetour);
     }
@@ -136,8 +131,8 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         for (var i = 0; i < 16; ++i)
         {
-            var taskButtonState = wondrousTailsData->TaskStatus(i);
-            var instances = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[i]);
+            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(i);
+            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[i]);
 
             if (instances.Contains(Service.ClientState.TerritoryType))
             {
@@ -159,14 +154,11 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             // Checks if the player is in a duty, excluding IslandSanctuary
             if (IsBoundByDuty()) return;
 
-            if (this.wondrousTailsData == null)
-                return;
-
             var duty = (DutySlot*)dutyPtr;
-            var status = this.wondrousTailsData->TaskStatus(duty->index);
-            if (status is ButtonState.Completable)
+            var status = PlayerState.Instance()->GetWeeklyBingoTaskStatus(duty->index);
+            if (status is PlayerState.WeeklyBingoTaskStatus.Open)
             {
-                var dutiesForTask = TaskLookup.GetInstanceListFromID(wondrousTailsData->Tasks[duty->index]);
+                var dutiesForTask = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[duty->index]);
 
                 var territoryType = dutiesForTask.FirstOrDefault();
                 var cfc = Service.DataManager.GetExcelSheet<Sheets.ContentFinderCondition>()!
@@ -186,9 +178,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
     private bool UpdateGameState(AddonWeeklyBingo* addon)
     {
-        if (this.wondrousTailsData == null)
-            return false;
-
         var stateChanged = false;
         for (var i = 0; i < 16; i++)
         {
@@ -375,22 +364,22 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
-    private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, ButtonState taskState)
+    private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
     {
         var node = GetBorderResourceNode(addon, slot);
         if (node != null)
         {
             switch (taskState)
             {
-                case ButtonState.Completable:
+                case PlayerState.WeeklyBingoTaskStatus.Open:
                     node->AtkResNode.ToggleVisibility(false);
                     break;
 
-                case ButtonState.AvailableNow:
+                case PlayerState.WeeklyBingoTaskStatus.Claimable:
                     node->AtkResNode.ToggleVisibility(true);
                     break;
 
-                case ButtonState.Unavailable:
+                case PlayerState.WeeklyBingoTaskStatus.Claimed:
                     node->AtkResNode.ToggleVisibility(false);
                     break;
             }
@@ -421,38 +410,10 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         for (var i = 0; i < uldManager.NodeListCount; i++)
         {
             var n = uldManager.NodeList[i];
-            if (n->NodeID != nodeId || type != null && n->Type != type.Value) continue;
+            if (n->NodeID != nodeId || (type != null && n->Type != type.Value)) continue;
             return (T*)n;
         }
+
         return null;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Offset ordering")]
-    public unsafe struct WondrousTails
-    {
-        [FieldOffset(0x06)]
-        public fixed byte Tasks[16];
-
-        [FieldOffset(0x16)]
-        public readonly uint Rewards;
-
-        [FieldOffset(0x1A)]
-        private readonly ushort _stickers;
-
-        public int Stickers => 
-            BitOperations.PopCount(_stickers);
-
-        [FieldOffset(0x20)]
-        private readonly ushort _secondChance;
-
-        public int SecondChance => 
-            (_secondChance >> 7) & 0b1111;
-
-        [FieldOffset(0x22)] 
-        private fixed byte _taskStatus[4];
-
-        public ButtonState TaskStatus(int idx)
-            => (ButtonState) ((_taskStatus[idx >> 2] >> ((idx & 0b11) * 2)) & 0b11);
     }
 }
