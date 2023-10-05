@@ -46,13 +46,11 @@ internal class Service
     [PluginService]
     internal static IGameInteropProvider Hooker { get; private set; } = null!;
 
-        /// <summary>
-        /// Gets the Dalamud Service.PluginLog class.
-        /// </summary>
-        [PluginService]
-        internal static IPluginLog PluginLog { get; private set; } = null!;
-    }
-}
+    /// <summary>
+    /// Gets the Dalamud AddonLifecycle class.
+    /// </summary>
+    [PluginService]
+    internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
 
     /// <summary>
     /// Gets the Dalamud Service.PluginLog class.
