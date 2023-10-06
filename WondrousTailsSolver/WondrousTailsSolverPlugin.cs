@@ -113,31 +113,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
-    private void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
-    {
-        var node = this.GetBorderResourceNode(addon, slot);
-        if (node != null)
-        {
-            switch (taskState)
-            {
-                case PlayerState.WeeklyBingoTaskStatus.Open:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimable:
-                    node->AtkResNode.ToggleVisibility(true);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimed:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-            }
-
-            // Default Color
-            node->AtkResNode.Color = new Vector4(1.0f, 1.0f, 1.0f, 0.678f).ToByteColor();
-        }
-    }
-
     private void AddonDutyReceiveEventDetour(IntPtr dutyPtr, ushort a2, uint a3, IntPtr a4, IntPtr a5)
     {
         this.addonDutyReceiveEventHook?.Original(dutyPtr, a2, a3, a4, a5);
@@ -169,8 +144,44 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
+    private void AddonFinalizeDetour(AddonEvent type, AddonArgs args)
+    {
+        if (this.probabilityTextNode is not null)
+        {
+            this.probabilityTextNode->AtkResNode.Destroy(true);
+            this.probabilityTextNode = null;
+        }
+
+        this.currentDutyNode = null;
+    }
+
     private AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
         => (AtkNineGridNode*)addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase.UldManager.SearchNodeById(11);
+
+    private void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
+    {
+        var node = this.GetBorderResourceNode(addon, slot);
+        if (node != null)
+        {
+            switch (taskState)
+            {
+                case PlayerState.WeeklyBingoTaskStatus.Open:
+                    node->AtkResNode.ToggleVisibility(false);
+                    break;
+
+                case PlayerState.WeeklyBingoTaskStatus.Claimable:
+                    node->AtkResNode.ToggleVisibility(true);
+                    break;
+
+                case PlayerState.WeeklyBingoTaskStatus.Claimed:
+                    node->AtkResNode.ToggleVisibility(false);
+                    break;
+            }
+
+            // Default Color
+            node->AtkResNode.Color = new Vector4(1.0f, 1.0f, 1.0f, 0.678f).ToByteColor();
+        }
+    }
 
     private void LogStickerState()
     {
@@ -182,17 +193,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
 
         Service.PluginLog.Debug($"State has changed: {sb}");
-    }
-
-    private void AddonFinalizeDetour(AddonEvent type, AddonArgs args)
-    {
-        if (this.probabilityTextNode is not null)
-        {
-            this.probabilityTextNode->AtkResNode.Destroy(true);
-            this.probabilityTextNode = null;
-        }
-
-        this.currentDutyNode = null;
     }
 
     private void UpdateGameState()
