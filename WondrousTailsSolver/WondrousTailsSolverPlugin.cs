@@ -26,10 +26,11 @@ namespace WondrousTailsSolver;
 /// </summary>
 public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 {
-    private AtkTextNode* probabilityTextNode = null;
-
     private readonly PerfectTails perfectTails = new();
     private readonly bool[] gameState = new bool[16];
+
+    private AtkTextNode* probabilityTextNode = null;
+    private AtkNineGridNode* currentDutyNode = null;
 
     private Hook<DutyReceiveEventDelegate>? addonDutyReceiveEventHook;
 
@@ -42,6 +43,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         pluginInterface.Create<Service>();
 
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "WeeklyBingo", this.AddonSetupDetour);
+        Service.AddonLifecycle.RegisterListener(AddonEvent.PostDraw, "WeeklyBingo", this.AddonDrawDetour);
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "WeeklyBingo", this.AddonRefreshDetour);
         Service.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "WeeklyBingo", this.AddonFinalizeDetour);
     }
@@ -51,64 +53,69 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     /// <inheritdoc/>
     public void Dispose()
     {
-        Service.AddonLifecycle.UnregisterListener(this.AddonRefreshDetour, this.AddonSetupDetour, this.AddonFinalizeDetour);
+        Service.AddonLifecycle.UnregisterListener(this.AddonSetupDetour);
+        Service.AddonLifecycle.UnregisterListener(this.AddonDrawDetour);
+        Service.AddonLifecycle.UnregisterListener(this.AddonRefreshDetour);
+        Service.AddonLifecycle.UnregisterListener(this.AddonFinalizeDetour);
 
         this.addonDutyReceiveEventHook?.Dispose();
     }
 
-    // Color format is RGBA
-    private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
+    private void AddonSetupDetour(AddonEvent type, AddonArgs args)
     {
-        var node = GetBorderResourceNode(addon, slot);
-        if (node != null)
+        var addon = (AddonWeeklyBingo*)args.Addon;
+
+        this.MakeTextNode(addon);
+
+        var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
+        this.addonDutyReceiveEventHook ??= Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
+        this.addonDutyReceiveEventHook?.Enable();
+    }
+
+    private void AddonDrawDetour(AddonEvent type, AddonArgs args)
+    {
+        if (this.currentDutyNode is not null)
         {
-            node->AtkResNode.ToggleVisibility(true);
-            node->AtkResNode.Color = color.ToByteColor();
+            currentDutyNode->AtkResNode.ToggleVisibility(true);
+            currentDutyNode->AtkResNode.Color = new Vector4(1.0f, 0.607f, 0.607f, 1.0f).ToByteColor();
         }
     }
 
-    private void MakeTextNode(AddonWeeklyBingo* addon)
+    private void AddonRefreshDetour(AddonEvent type, AddonArgs args)
     {
-        if (addon->AtkUnitBase.UldManager.LoadedState is not AtkLoadState.Loaded) return;
-        var textNode = addon->AtkUnitBase.GetTextNodeById(34);
-        if (textNode is null) return;
+        var addon = (AddonWeeklyBingo*)args.Addon;
 
-        if (this.probabilityTextNode is null && addon is not null)
+        this.UpdateGameState();
+
+        // > 7 shuffling is disabled
+        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers > 7)
         {
-            this.probabilityTextNode = IMemorySpace.GetUISpace()->Create<AtkTextNode>();
+            return;
+        }
 
-            this.probabilityTextNode->AtkResNode.NodeFlags = NodeFlags.Enabled;
-            this.probabilityTextNode->AtkResNode.Type = NodeType.Text;
-            this.probabilityTextNode->AtkResNode.NodeID = 1000;
-            this.probabilityTextNode->AtkResNode.Height = (ushort)(textNode->AtkResNode.Height / 2.0f);
-            this.probabilityTextNode->AtkResNode.Width = textNode->AtkResNode.Width;
-            this.probabilityTextNode->AtkResNode.X = textNode->AtkResNode.X;
-            this.probabilityTextNode->AtkResNode.Y = textNode->AtkResNode.Y + (textNode->AtkResNode.Height / 2.0f);
+        this.LogStickerState();
 
-            this.probabilityTextNode->TextColor = textNode->TextColor;
-            this.probabilityTextNode->EdgeColor = textNode->EdgeColor;
-            this.probabilityTextNode->BackgroundColor = textNode->BackgroundColor;
-            this.probabilityTextNode->AlignmentFontType = textNode->AlignmentFontType;
-            this.probabilityTextNode->FontSize = textNode->FontSize;
-            this.probabilityTextNode->LineSpacing = textNode->LineSpacing;
-            this.probabilityTextNode->CharSpacing = textNode->CharSpacing;
-            this.probabilityTextNode->TextFlags = (byte)((TextFlags)textNode->TextFlags | TextFlags.MultiLine);
+        this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
 
-            this.probabilityTextNode->AtkResNode.ParentNode = textNode->AtkResNode.ParentNode;
-            this.probabilityTextNode->AtkResNode.NextSiblingNode = &textNode->AtkResNode;
-            this.probabilityTextNode->AtkResNode.PrevSiblingNode = textNode->AtkResNode.PrevSiblingNode;
-            this.probabilityTextNode->AtkResNode.ChildNode = null;
-            textNode->AtkResNode.PrevSiblingNode->PrevSiblingNode->NextSiblingNode = &this.probabilityTextNode->AtkResNode;
-            textNode->AtkResNode.PrevSiblingNode = &this.probabilityTextNode->AtkResNode;
-            textNode->AtkResNode.ParentNode->ChildCount++;
-            addon->AtkUnitBase.UldManager.UpdateDrawNodeList();
-            addon->AtkUnitBase.UpdateCollisionNodeList(false);
+        foreach (var index in Enumerable.Range(0, 16))
+        {
+            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(index);
+            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[index]);
+
+            if (instances.Contains(Service.ClientState.TerritoryType))
+            {
+                this.currentDutyNode = this.GetBorderResourceNode(addon, index);
+            }
+            else
+            {
+                this.ResetDutySlotBorder(addon, index, taskButtonState);
+            }
         }
     }
 
-    private static void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
+    private void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
     {
-        var node = GetBorderResourceNode(addon, slot);
+        var node = this.GetBorderResourceNode(addon, slot);
         if (node != null)
         {
             switch (taskState)
@@ -128,64 +135,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
             // Default Color
             node->AtkResNode.Color = new Vector4(1.0f, 1.0f, 1.0f, 0.678f).ToByteColor();
-        }
-    }
-
-    private static AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot) 
-        => (AtkNineGridNode*)addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase.UldManager.SearchNodeById(11);
-
-    private void AddonSetupDetour(AddonEvent type, AddonArgs args)
-    {
-        var addon = (AddonWeeklyBingo*)args.Addon;
-
-        this.MakeTextNode(addon);
-
-        var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
-        this.addonDutyReceiveEventHook ??= Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
-        this.addonDutyReceiveEventHook?.Enable();
-    }
-
-    private void AddonRefreshDetour(AddonEvent type, AddonArgs args)
-    {
-        var addon = (AddonWeeklyBingo*)args.Addon;
-
-        this.UpdateGameState();
-
-        // > 7 shuffling is disabled
-        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers > 7)
-        {
-            return;
-        }
-
-        var sb = new StringBuilder();
-        for (var i = 0; i < this.gameState.Length; i++)
-        {
-            sb.Append(this.gameState[i] ? "X" : "O");
-            if ((i + 1) % 4 == 0) sb.Append(' ');
-        }
-
-        Service.PluginLog.Debug($"State has changed: {sb}");
-
-        this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
-
-        foreach (var index in Enumerable.Range(0, 16))
-        {
-            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(index);
-            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[index]);
-
-            if (instances.Contains(Service.ClientState.TerritoryType))
-                SetDutySlotBorderColored(addon, index, new Vector4(1.0f, 0.607f, 0.607f, 1.0f));
-            else
-                ResetDutySlotBorder(addon, index, taskButtonState);
-        }
-    }
-
-    private void AddonFinalizeDetour(AddonEvent type, AddonArgs args)
-    {
-        if (this.probabilityTextNode is not null)
-        {
-            this.probabilityTextNode->AtkResNode.Destroy(true);
-            this.probabilityTextNode = null;
         }
     }
 
@@ -218,6 +167,32 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         {
             Service.PluginLog.Error(ex, "Boom");
         }
+    }
+
+    private AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
+        => (AtkNineGridNode*)addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase.UldManager.SearchNodeById(11);
+
+    private void LogStickerState()
+    {
+        var sb = new StringBuilder();
+        for (var i = 0; i < this.gameState.Length; i++)
+        {
+            sb.Append(this.gameState[i] ? "X" : "O");
+            if ((i + 1) % 4 == 0) sb.Append(' ');
+        }
+
+        Service.PluginLog.Debug($"State has changed: {sb}");
+    }
+
+    private void AddonFinalizeDetour(AddonEvent type, AddonArgs args)
+    {
+        if (this.probabilityTextNode is not null)
+        {
+            this.probabilityTextNode->AtkResNode.Destroy(true);
+            this.probabilityTextNode = null;
+        }
+
+        this.currentDutyNode = null;
     }
 
     private void UpdateGameState()
@@ -293,4 +268,43 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
     private string[] StringFormatDoubles(IEnumerable<double> values)
         => values.Select(v => $"{v * 100:F2}%").ToArray();
+
+    private void MakeTextNode(AddonWeeklyBingo* addon)
+    {
+        if (addon->AtkUnitBase.UldManager.LoadedState is not AtkLoadState.Loaded) return;
+        var textNode = addon->AtkUnitBase.GetTextNodeById(34);
+        if (textNode is null) return;
+
+        if (this.probabilityTextNode is null && addon is not null)
+        {
+            this.probabilityTextNode = IMemorySpace.GetUISpace()->Create<AtkTextNode>();
+
+            this.probabilityTextNode->AtkResNode.NodeFlags = NodeFlags.Enabled;
+            this.probabilityTextNode->AtkResNode.Type = NodeType.Text;
+            this.probabilityTextNode->AtkResNode.NodeID = 1000;
+            this.probabilityTextNode->AtkResNode.Height = (ushort)(textNode->AtkResNode.Height / 2.0f);
+            this.probabilityTextNode->AtkResNode.Width = textNode->AtkResNode.Width;
+            this.probabilityTextNode->AtkResNode.X = textNode->AtkResNode.X;
+            this.probabilityTextNode->AtkResNode.Y = textNode->AtkResNode.Y + (textNode->AtkResNode.Height / 2.0f);
+
+            this.probabilityTextNode->TextColor = textNode->TextColor;
+            this.probabilityTextNode->EdgeColor = textNode->EdgeColor;
+            this.probabilityTextNode->BackgroundColor = textNode->BackgroundColor;
+            this.probabilityTextNode->AlignmentFontType = textNode->AlignmentFontType;
+            this.probabilityTextNode->FontSize = textNode->FontSize;
+            this.probabilityTextNode->LineSpacing = textNode->LineSpacing;
+            this.probabilityTextNode->CharSpacing = textNode->CharSpacing;
+            this.probabilityTextNode->TextFlags = (byte)((TextFlags)textNode->TextFlags | TextFlags.MultiLine);
+
+            this.probabilityTextNode->AtkResNode.ParentNode = textNode->AtkResNode.ParentNode;
+            this.probabilityTextNode->AtkResNode.NextSiblingNode = &textNode->AtkResNode;
+            this.probabilityTextNode->AtkResNode.PrevSiblingNode = textNode->AtkResNode.PrevSiblingNode;
+            this.probabilityTextNode->AtkResNode.ChildNode = null;
+            textNode->AtkResNode.PrevSiblingNode->PrevSiblingNode->NextSiblingNode = &this.probabilityTextNode->AtkResNode;
+            textNode->AtkResNode.PrevSiblingNode = &this.probabilityTextNode->AtkResNode;
+            textNode->AtkResNode.ParentNode->ChildCount++;
+            addon->AtkUnitBase.UldManager.UpdateDrawNodeList();
+            addon->AtkUnitBase.UpdateCollisionNodeList(false);
+        }
+    }
 }
