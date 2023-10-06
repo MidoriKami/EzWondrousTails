@@ -85,30 +85,29 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     {
         var addon = (AddonWeeklyBingo*)args.Addon;
 
-        this.UpdateGameState();
-
-        // > 7 shuffling is disabled
-        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers > 7)
+        // Update GameState
+        foreach (var index in Enumerable.Range(0, 16))
         {
-            return;
+            this.gameState[index] = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(index);
         }
 
         this.LogStickerState();
 
-        this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
-
-        foreach (var index in Enumerable.Range(0, 16))
+        // > 7 shuffling is disabled
+        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers is <= 7 and >= 1)
         {
-            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(index);
-            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[index]);
+            this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
+        }
 
-            if (instances.Contains(Service.ClientState.TerritoryType))
+        // Find the node for the currently occupied duty
+        if (Service.Condition.Any(ConditionFlag.BoundByDuty, ConditionFlag.BoundByDuty56, ConditionFlag.BoundByDuty95))
+        {
+            foreach (var index in Enumerable.Range(0, 16))
             {
-                this.currentDutyNode = this.GetBorderResourceNode(addon, index);
-            }
-            else
-            {
-                this.ResetDutySlotBorder(addon, index, taskButtonState);
+                if (TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[index]).Contains(Service.ClientState.TerritoryType))
+                {
+                    this.currentDutyNode = this.GetBorderResourceNode(addon, index);
+                }
             }
         }
     }
@@ -158,31 +157,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     private AtkNineGridNode* GetBorderResourceNode(AddonWeeklyBingo* addon, int dutySlot)
         => (AtkNineGridNode*)addon->DutySlotList[dutySlot].DutyButton->AtkComponentBase.UldManager.SearchNodeById(11);
 
-    private void ResetDutySlotBorder(AddonWeeklyBingo* addon, int slot, PlayerState.WeeklyBingoTaskStatus taskState)
-    {
-        var node = this.GetBorderResourceNode(addon, slot);
-        if (node != null)
-        {
-            switch (taskState)
-            {
-                case PlayerState.WeeklyBingoTaskStatus.Open:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimable:
-                    node->AtkResNode.ToggleVisibility(true);
-                    break;
-
-                case PlayerState.WeeklyBingoTaskStatus.Claimed:
-                    node->AtkResNode.ToggleVisibility(false);
-                    break;
-            }
-
-            // Default Color
-            node->AtkResNode.Color = new Vector4(1.0f, 1.0f, 1.0f, 0.678f).ToByteColor();
-        }
-    }
-
     private void LogStickerState()
     {
         var sb = new StringBuilder();
@@ -193,15 +167,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
 
         Service.PluginLog.Debug($"State has changed: {sb}");
-    }
-
-    private void UpdateGameState()
-    {
-        for (var i = 0; i < 16; i++)
-        {
-            var state = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(i);
-            this.gameState[i] = state;
-        }
     }
 
     private SeString SolveAndGetProbabilitySeString()
