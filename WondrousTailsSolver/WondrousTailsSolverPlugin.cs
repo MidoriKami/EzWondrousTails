@@ -69,11 +69,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         this.addonDutyReceiveEventHook?.Dispose();
     }
 
-    private static bool IsBoundByDuty() => Service.Condition.Any(
-        ConditionFlag.BoundByDuty,
-        ConditionFlag.BoundByDuty56,
-        ConditionFlag.BoundByDuty95);
-
     // Color format is RGBA
     private static void SetDutySlotBorderColored(AddonWeeklyBingo* addon, int slot, Vector4 color)
     {
@@ -219,12 +214,12 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         try
         {
-            // Checks if the player is in a duty, excluding IslandSanctuary
-            if (IsBoundByDuty()) return;
+            // Checks if the player is in a duty
+            if (Service.Condition.Any(ConditionFlag.BoundByDuty, ConditionFlag.BoundByDuty56, ConditionFlag.BoundByDuty95))
+                return;
 
             var duty = (DutySlot*)dutyPtr;
-            var status = PlayerState.Instance()->GetWeeklyBingoTaskStatus(duty->index);
-            if (status is PlayerState.WeeklyBingoTaskStatus.Open)
+            if (PlayerState.Instance()->GetWeeklyBingoTaskStatus(duty->index) is PlayerState.WeeklyBingoTaskStatus.Open)
             {
                 var dutiesForTask = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[duty->index]);
 
