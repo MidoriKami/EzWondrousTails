@@ -94,7 +94,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         this.LogStickerState();
 
         // > 7 shuffling is disabled
-        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers is <= 7 and >= 1)
+        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers is >= 1 and <= 7)
         {
             this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
         }
@@ -184,51 +184,49 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         {
             return new SeStringBuilder()
                 .AddText("Line Chances: ")
-                .AddUiForeground("error", 704)
-                .AddUiForeground("error", 704)
-                .AddUiForeground("error", 704)
+                .AddUiForeground("error ", 704)
+                .AddUiForeground("error ", 704)
+                .AddUiForeground("error ", 704)
                 .Build();
+        }
+
+        var valuePayloads = this.StringFormatDoubles(values);
+        var seString = new SeStringBuilder()
+            .AddText("\nLine Chances: ");
+
+        if (samples != null)
+        {
+            foreach (var (value, sample, valuePayload) in Enumerable.Range(0, values.Length).Select(i => (values[i], samples[i], valuePayloads[i])))
+            {
+                const double bound = 0.05;
+                var sampleBoundLower = Math.Max(0, sample - bound);
+                // var sampleBoundUpper = Math.Min(1, sample + bound);
+
+                if (Math.Abs(value - 1) < 0.1f)
+                    seString.AddUiGlow(valuePayload, 2);
+                else if (value < 1 && value >= sample)
+                    seString.AddUiForeground(valuePayload, 67);
+                else if (sample > value && value > sampleBoundLower)
+                    seString.AddUiForeground(valuePayload, 66);
+                else if (sampleBoundLower > value && value > 0)
+                    seString.AddUiForeground(valuePayload, 561);
+                else if (value == 0)
+                    seString.AddUiForeground(valuePayload, 704);
+                else
+                    seString.AddText(valuePayload);
+
+                seString.AddText("  ");
+            }
+
+            seString.AddText("\rShuffle Average: ");
+            seString.AddText(string.Join(" ", this.StringFormatDoubles(samples)));
         }
         else
         {
-            var valuePayloads = this.StringFormatDoubles(values);
-            var seString = new SeStringBuilder()
-                .AddText("\nLine Chances: ");
-
-            if (samples != null)
-            {
-                foreach (var (value, sample, valuePayload) in Enumerable.Range(0, values.Length).Select(i => (values[i], samples[i], valuePayloads[i])))
-                {
-                    const double bound = 0.05;
-                    var sampleBoundLower = Math.Max(0, sample - bound);
-                    // var sampleBoundUpper = Math.Min(1, sample + bound);
-
-                    if (Math.Abs(value - 1) < 0.1f)
-                        seString.AddUiGlow(valuePayload, 2);
-                    else if (value < 1 && value >= sample)
-                        seString.AddUiForeground(valuePayload, 67);
-                    else if (sample > value && value > sampleBoundLower)
-                        seString.AddUiForeground(valuePayload, 66);
-                    else if (sampleBoundLower > value && value > 0)
-                        seString.AddUiForeground(valuePayload, 561);
-                    else if (value == 0)
-                        seString.AddUiForeground(valuePayload, 704);
-                    else
-                        seString.Append(valuePayload);
-
-                    seString.AddText("  ");
-                }
-
-                seString.AddText("\rShuffle Average: ");
-                seString.AddText(string.Join(" ", this.StringFormatDoubles(samples)));
-            }
-            else
-            {
-                seString.AddText(string.Join(" ", valuePayloads));
-            }
-
-            return seString.Build();
+            seString.AddText(string.Join(" ", valuePayloads));
         }
+
+        return seString.Build();
     }
 
     private string[] StringFormatDoubles(IEnumerable<double> values)
