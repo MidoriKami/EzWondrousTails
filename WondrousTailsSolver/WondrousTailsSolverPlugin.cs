@@ -8,7 +8,6 @@ using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Dalamud.Utility.Numerics;
@@ -27,19 +26,6 @@ namespace WondrousTailsSolver;
 /// </summary>
 public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 {
-    private static readonly UIGlowPayload GoldenGlow = new(2);
-    private static readonly UIForegroundPayload SecretDelimiter = new(51);
-    private static readonly UIForegroundPayload HappyGreen = new(67);
-    private static readonly UIForegroundPayload MellowYellow = new(66);
-    private static readonly UIForegroundPayload PinkSalmon = new(561);
-    private static readonly UIForegroundPayload AngryRed = new(704);
-    private static readonly UIForegroundPayload ColorOff = UIForegroundPayload.UIForegroundOff;
-    private static readonly UIGlowPayload GlowOff = UIGlowPayload.UIGlowOff;
-
-    private static readonly TextPayload ErrorText = new("error");
-    private static readonly TextPayload ChancesText = new("Line Chances: ");
-    private static readonly TextPayload ShuffleText = new("\rShuffle Average: ");
-
     private AtkTextNode* probabilityTextNode = null;
 
     private readonly PerfectTails perfectTails = new();
@@ -108,8 +94,6 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
             this.probabilityTextNode->CharSpacing = textNode->CharSpacing;
             this.probabilityTextNode->TextFlags = (byte)((TextFlags)textNode->TextFlags | TextFlags.MultiLine);
 
-            this.probabilityTextNode->SetText("Test Text");
-
             this.probabilityTextNode->AtkResNode.ParentNode = textNode->AtkResNode.ParentNode;
             this.probabilityTextNode->AtkResNode.NextSiblingNode = &textNode->AtkResNode;
             this.probabilityTextNode->AtkResNode.PrevSiblingNode = textNode->AtkResNode.PrevSiblingNode;
@@ -165,12 +149,11 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     {
         var addon = (AddonWeeklyBingo*)args.Addon;
 
-        this.UpdateGameState(addon);
+        this.UpdateGameState();
 
-        var placedStickers = PlayerState.Instance()->WeeklyBingoNumPlacedStickers;
-        if (placedStickers > 7)
+        // > 7 shuffling is disabled
+        if (PlayerState.Instance()->WeeklyBingoNumPlacedStickers > 7)
         {
-            // > 7 shuffling is disabled
             return;
         }
 
@@ -185,19 +168,15 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         this.probabilityTextNode->SetText(this.SolveAndGetProbabilitySeString().Encode());
 
-        for (var i = 0; i < 16; ++i)
+        foreach (var index in Enumerable.Range(0, 16))
         {
-            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(i);
-            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[i]);
+            var taskButtonState = PlayerState.Instance()->GetWeeklyBingoTaskStatus(index);
+            var instances = TaskLookup.GetInstanceListFromID(PlayerState.Instance()->WeeklyBingoOrderData[index]);
 
             if (instances.Contains(Service.ClientState.TerritoryType))
-            {
-                SetDutySlotBorderColored(addon, i, new Vector4(1.0f, 0.607f, 0.607f, 1.0f));
-            }
+                SetDutySlotBorderColored(addon, index, new Vector4(1.0f, 0.607f, 0.607f, 1.0f));
             else
-            {
-                ResetDutySlotBorder(addon, i, taskButtonState);
-            }
+                ResetDutySlotBorder(addon, index, taskButtonState);
         }
     }
 
@@ -232,7 +211,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                 if (cfc == null)
                     return;
 
-                this.OpenRegularDuty(cfc.RowId);
+                AgentContentsFinder.Instance()->OpenRegularDuty(cfc.RowId);
             }
         }
         catch (Exception ex)
@@ -241,17 +220,13 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         }
     }
 
-    private bool UpdateGameState(AddonWeeklyBingo* addon)
+    private void UpdateGameState()
     {
-        var stateChanged = false;
         for (var i = 0; i < 16; i++)
         {
             var state = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(i);
-            stateChanged |= this.gameState[i] != state;
             this.gameState[i] = state;
         }
-
-        return stateChanged;
     }
 
     private SeString SolveAndGetProbabilitySeString()
@@ -267,20 +242,18 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         if (values == PerfectTails.Error)
         {
-            var seString = new SeString(new List<Payload>())
-                .Append(SecretDelimiter).Append("\r").Append(ColorOff)
-                .Append(ChancesText)
-                .Append(AngryRed).Append(ErrorText).Append(ColorOff).Append("  ")
-                .Append(AngryRed).Append(ErrorText).Append(ColorOff).Append("  ")
-                .Append(AngryRed).Append(ErrorText).Append(ColorOff);
-            return seString;
+            return new SeStringBuilder()
+                .AddText("Line Chances: ")
+                .AddUiForeground("error", 704)
+                .AddUiForeground("error", 704)
+                .AddUiForeground("error", 704)
+                .Build();
         }
         else
         {
             var valuePayloads = this.StringFormatDoubles(values);
-            var seString = new SeString(new List<Payload>())
-                .Append(SecretDelimiter).Append("\r").Append(ColorOff)
-                .Append(ChancesText);
+            var seString = new SeStringBuilder()
+                .AddText("\nLine Chances: ");
 
             if (samples != null)
             {
@@ -291,93 +264,33 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
                     // var sampleBoundUpper = Math.Min(1, sample + bound);
 
                     if (Math.Abs(value - 1) < 0.1f)
-                    {
-                        seString.Append(GoldenGlow).Append(valuePayload).Append(GlowOff);
-                    }
+                        seString.AddUiGlow(valuePayload, 2);
                     else if (value < 1 && value >= sample)
-                    {
-                        seString.Append(HappyGreen).Append(valuePayload).Append(ColorOff);
-                    }
+                        seString.AddUiForeground(valuePayload, 67);
                     else if (sample > value && value > sampleBoundLower)
-                    {
-                        seString.Append(MellowYellow).Append(valuePayload).Append(ColorOff);
-                    }
+                        seString.AddUiForeground(valuePayload, 66);
                     else if (sampleBoundLower > value && value > 0)
-                    {
-                        seString.Append(PinkSalmon).Append(valuePayload).Append(ColorOff);
-                    }
+                        seString.AddUiForeground(valuePayload, 561);
                     else if (value == 0)
-                    {
-                        seString.Append(AngryRed).Append(valuePayload).Append(ColorOff);
-                    }
+                        seString.AddUiForeground(valuePayload, 704);
                     else
-                    {
-                        // Just in case
                         seString.Append(valuePayload);
-                    }
 
-                    seString.Append("  ");
+                    seString.AddText("  ");
                 }
 
-                seString.Append(ShuffleText);
-                var sampleStrings = this.StringFormatDoubles(samples);
-                foreach (var sampleString in sampleStrings)
-                    seString.Append(sampleString).Append("  ");
+                seString.AddText("\rShuffle Average: ");
+                seString.AddText(string.Join(" ", this.StringFormatDoubles(samples)));
             }
             else
             {
-                foreach (var valueString in valuePayloads)
-                    seString.Append(valueString).Append("  ");
+                seString.AddText(string.Join(" ", valuePayloads));
             }
 
-            return seString;
+            return seString.Build();
         }
     }
 
-    private TextPayload[] StringFormatDoubles(IEnumerable<double> values)
-        => values.Select(v => new TextPayload($"{v * 100:F2}%")).ToArray();
-
-    private bool SeStringTryFindDelimiter(SeString seString, out int index)
-    {
-        var secretBytes = SecretDelimiter.Encode();
-        for (var i = 0; i < seString.Payloads.Count; i++)
-        {
-            var payload = seString.Payloads[i];
-            if (payload is UIForegroundPayload)
-            {
-                if (payload.Encode().SequenceEqual(secretBytes))
-                {
-                    index = i;
-                    return true;
-                }
-            }
-        }
-
-        index = -1;
-        return false;
-    }
-
-    private bool SeStringContainsProbabilityString(SeString seString)
-        => this.SeStringTryFindDelimiter(seString, out _);
-
-    private void RemoveProbabilityString(SeString seString)
-    {
-        if (this.SeStringTryFindDelimiter(seString, out var index))
-        {
-            var removeCount = seString.Payloads.Count - index;
-            try
-            {
-                seString.Payloads.RemoveRange(index, removeCount);
-            }
-            catch (ArgumentException)
-            {
-                Service.PluginLog.Warning($"ArgExc during RemoveProbabilityString, count={seString.Payloads.Count} index={index} removeCount={removeCount}");
-            }
-        }
-    }
-
-    private void OpenRegularDuty(uint contentFinderCondition)
-    {
-        AgentContentsFinder.Instance()->OpenRegularDuty(contentFinderCondition);
-    }
+    private string[] StringFormatDoubles(IEnumerable<double> values)
+        => values.Select(v => $"{v * 100:F2}%").ToArray();
 }
