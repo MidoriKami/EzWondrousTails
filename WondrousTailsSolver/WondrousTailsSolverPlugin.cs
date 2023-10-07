@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Text;
 
 using Dalamud.Game.Addon.Lifecycle;
@@ -9,6 +8,7 @@ using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Hooking;
+using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Utility.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
@@ -16,6 +16,7 @@ using FFXIVClientStructs.FFXIV.Client.System.Memory;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using WondrousTailsSolver.Config;
 
 using Sheets = Lumina.Excel.GeneratedSheets;
 
@@ -29,6 +30,10 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     private readonly PerfectTails perfectTails = new();
     private readonly bool[] gameState = new bool[16];
 
+    private readonly WindowSystem windowSystem = new("EzWondrousTails");
+    private readonly Configuration configuration;
+    private readonly ConfigurationWindow configurationWindow;
+
     private AtkTextNode* probabilityTextNode = null;
     private AtkNineGridNode* currentDutyNode = null;
 
@@ -41,6 +46,14 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     public WondrousTailsSolverPlugin(DalamudPluginInterface pluginInterface)
     {
         pluginInterface.Create<Service>();
+
+        this.configuration = Service.Interface.GetPluginConfig() as Configuration ?? new Configuration();
+
+        this.configurationWindow = new ConfigurationWindow(this.configuration);
+        this.windowSystem.AddWindow(this.configurationWindow);
+
+        Service.Interface.UiBuilder.Draw += this.windowSystem.Draw;
+        Service.Interface.UiBuilder.OpenConfigUi += this.configurationWindow.Toggle;
 
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "WeeklyBingo", this.AddonSetupDetour);
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostDraw, "WeeklyBingo", this.AddonDrawDetour);
@@ -59,6 +72,11 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         Service.AddonLifecycle.UnregisterListener(this.AddonFinalizeDetour);
 
         this.addonDutyReceiveEventHook?.Dispose();
+
+        Service.Interface.UiBuilder.Draw += null;
+        Service.Interface.UiBuilder.OpenConfigUi += null;
+
+        this.windowSystem.RemoveWindow(this.configurationWindow);
     }
 
     private void AddonSetupDetour(AddonEvent type, AddonArgs args)
@@ -77,7 +95,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
         if (this.currentDutyNode is not null)
         {
             currentDutyNode->AtkResNode.ToggleVisibility(true);
-            currentDutyNode->AtkResNode.Color = new Vector4(1.0f, 0.607f, 0.607f, 1.0f).ToByteColor();
+            currentDutyNode->AtkResNode.Color = this.configuration.CurrentDutyColor.ToByteColor();
         }
     }
 
