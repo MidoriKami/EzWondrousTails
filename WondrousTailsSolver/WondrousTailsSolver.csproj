@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
-    <Version>2.3.1.0</Version>
+    <Version>2.3.1.1</Version>
     <Authors>daemitus,MidoriKami</Authors>
     <PackageProjectUrl>https://github.com/daemitus/WondrousTailsSolver</PackageProjectUrl>
   </PropertyGroup>

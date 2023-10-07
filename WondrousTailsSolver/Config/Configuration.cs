@@ -7,7 +7,7 @@ using Dalamud.Interface;
 namespace WondrousTailsSolver.Config;
 
 /// <summary>
-/// Class that represents configuration data for EzWondrousTails
+/// Class that represents configuration data for EzWondrousTails.
 /// </summary>
 public class Configuration : IPluginConfiguration
 {
