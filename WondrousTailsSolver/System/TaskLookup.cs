@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
-using Dalamud;
+using Dalamud.Game;
 using Dalamud.Utility;
 using Lumina.Excel.GeneratedSheets;
 

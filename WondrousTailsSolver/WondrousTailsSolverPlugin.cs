@@ -43,7 +43,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
     /// Initializes a new instance of the <see cref="WondrousTailsSolverPlugin"/> class.
     /// </summary>
     /// <param name="pluginInterface">Dalamud plugin interface.</param>
-    public WondrousTailsSolverPlugin(DalamudPluginInterface pluginInterface)
+    public WondrousTailsSolverPlugin(IDalamudPluginInterface pluginInterface)
     {
         pluginInterface.Create<Service>();
 
@@ -85,7 +85,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
         this.MakeTextNode(addon);
 
-        var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.vtbl[2];
+        var dutyReceiveEvent = (IntPtr)addon->DutySlotList.DutySlot1.addon->VirtualTable->ReceiveEvent;
         this.addonDutyReceiveEventHook ??= Service.Hooker.HookFromAddress<DutyReceiveEventDelegate>(dutyReceiveEvent, this.AddonDutyReceiveEventDetour);
         this.addonDutyReceiveEventHook?.Enable();
     }
@@ -262,7 +262,7 @@ public sealed unsafe class WondrousTailsSolverPlugin : IDalamudPlugin
 
             this.probabilityTextNode->AtkResNode.NodeFlags = NodeFlags.Enabled;
             this.probabilityTextNode->AtkResNode.Type = NodeType.Text;
-            this.probabilityTextNode->AtkResNode.NodeID = 1000;
+            this.probabilityTextNode->AtkResNode.NodeId = 1000;
             this.probabilityTextNode->AtkResNode.Height = (ushort)(textNode->AtkResNode.Height / 2.0f);
             this.probabilityTextNode->AtkResNode.Width = textNode->AtkResNode.Width;
             this.probabilityTextNode->AtkResNode.X = textNode->AtkResNode.X;
