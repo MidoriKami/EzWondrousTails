@@ -7,13 +7,12 @@ namespace WondrousTailsSolver;
 /// <summary>
 /// Dalamud and plugin services.
 /// </summary>
-internal class Service
-{
+internal class Service {
     /// <summary>
     /// Gets the Dalamud plugin interface.
     /// </summary>
     [PluginService]
-    internal static DalamudPluginInterface Interface { get; private set; } = null!;
+    internal static IDalamudPluginInterface Interface { get; private set; } = null!;
 
     /// <summary>
     /// Gets the Dalamud data manager.

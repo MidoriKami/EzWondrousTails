@@ -7,8 +7,7 @@ namespace WondrousTailsSolver;
 /// <summary>
 /// Minigame solver.
 /// </summary>
-internal sealed partial class PerfectTails
-{
+internal sealed partial class PerfectTails {
     private static readonly Random Random = new();
     private readonly Dictionary<int, long[]> possibleBoards = new();
     private readonly Dictionary<int, double[]> sampleProbabilities = new();
@@ -16,8 +15,7 @@ internal sealed partial class PerfectTails
     /// <summary>
     /// Initializes a new instance of the <see cref="PerfectTails"/> class.
     /// </summary>
-    public PerfectTails()
-    {
+    public PerfectTails() {
         this.CalculateBoards(0, 0, 0, 0, 0);
         this.CalculateSamples();
     }
@@ -25,15 +23,14 @@ internal sealed partial class PerfectTails
     /// <summary>
     /// Gets the error response.
     /// </summary>
-    public static double[] Error { get; } = { -1, -1, -1 };
+    public static double[] Error { get; } = [-1, -1, -1];
 
     /// <summary>
     /// Solve the board.
     /// </summary>
     /// <param name="cells">Current board state.</param>
     /// <returns>Array of probabilities.</returns>
-    public double[] Solve(bool[] cells)
-    {
+    public double[] Solve(bool[] cells) {
         var counts = this.Values(cells);
 
         if (counts == null)
@@ -50,52 +47,36 @@ internal sealed partial class PerfectTails
     /// </summary>
     /// <param name="stickersPlaced">Number of stickers placed.</param>
     /// <returns>Sampled probabilities.</returns>
-    public double[] GetSample(int stickersPlaced)
-    {
-        if (this.sampleProbabilities.TryGetValue(stickersPlaced, out var probabilities))
-            return probabilities;
-
-        return Error;
+    public double[] GetSample(int stickersPlaced) {
+        return this.sampleProbabilities.GetValueOrDefault(stickersPlaced, Error);
     }
 
-    private long[]? Values(bool[] cells)
-    {
-        var mask = CellsToMask(cells);
-
-        if (this.possibleBoards.TryGetValue(mask, out var counts))
-            return counts;
-
-        return null;
+    private long[]? Values(bool[] cells) {
+        return this.possibleBoards.GetValueOrDefault(CellsToMask(cells));
     }
 
-    private long[] CalculateBoards(int mask, int numStickers, int numRows, int numCols, int numDiags)
-    {
+    private long[] CalculateBoards(int mask, int numStickers, int numRows, int numCols, int numDiags) {
         if (this.possibleBoards.TryGetValue(mask, out var result))
             return result;
 
-        if (numStickers == 9)
-        {
+        if (numStickers == 9) {
             var lines = numRows + numCols + numDiags;
-            return this.possibleBoards[mask] = new long[]
-            {
+            return this.possibleBoards[mask] = [
                 1,
                 lines >= 1 ? 1 : 0,
                 lines >= 2 ? 1 : 0,
                 lines >= 3 ? 1 : 0,
-            };
+            ];
         }
 
-        if (numStickers > 9)
-        {
-            return this.possibleBoards[mask] = new long[] { 0, 0, 0, 0 };
+        if (numStickers > 9) {
+            return this.possibleBoards[mask] = [0, 0, 0, 0];
         }
 
-        result = this.possibleBoards[mask] = new long[] { 0, 0, 0, 0 };
+        result = this.possibleBoards[mask] = [0, 0, 0, 0];
 
-        for (var r = 0; r < 4; r++)
-        {
-            for (var c = 0; c < 4; c++)
-            {
+        for (var r = 0; r < 4; r++) {
+            for (var c = 0; c < 4; c++) {
                 if (MaskHasBit(mask, r, c))
                     continue;
 
@@ -116,13 +97,10 @@ internal sealed partial class PerfectTails
         return result;
     }
 
-    private void CalculateSamples()
-    {
-        for (var stickersPlaced = 1; stickersPlaced <= 7; stickersPlaced++)
-        {
+    private void CalculateSamples() {
+        for (var stickersPlaced = 1; stickersPlaced <= 7; stickersPlaced++) {
             var samples = new List<double[]>();
-            for (var i = 0; i < 500; i++)
-            {
+            for (var i = 0; i < 500; i++) {
                 var sampleState = new bool[16];
                 var sampleIndexes = Enumerable.Range(0, 16)
                     .OrderBy(_ => Random.Next())
@@ -134,12 +112,11 @@ internal sealed partial class PerfectTails
                 samples.Add(this.Solve(sampleState));
             }
 
-            this.sampleProbabilities[stickersPlaced] = new[]
-            {
+            this.sampleProbabilities[stickersPlaced] = [
                 Math.Round(samples.Average(s => s[0]), 4),
                 Math.Round(samples.Average(s => s[1]), 4),
                 Math.Round(samples.Average(s => s[2]), 4),
-            };
+            ];
         }
     }
 }
@@ -147,15 +124,11 @@ internal sealed partial class PerfectTails
 /// <summary>
 /// Static calculations.
 /// </summary>
-internal sealed partial class PerfectTails
-{
-    private static int CellsToMask(bool[] cells)
-    {
+internal sealed partial class PerfectTails {
+    private static int CellsToMask(bool[] cells) {
         var mask = 0;
-        for (var r = 0; r < 4; r++)
-        {
-            for (var c = 0; c < 4; c++)
-            {
+        for (var r = 0; r < 4; r++) {
+            for (var c = 0; c < 4; c++) {
                 if (cells[(r * 4) + c])
                     mask = SetMaskBit(mask, r, c);
             }

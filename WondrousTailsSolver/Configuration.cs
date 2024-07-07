@@ -4,13 +4,12 @@ using System.Numerics;
 using Dalamud.Configuration;
 using Dalamud.Interface;
 
-namespace WondrousTailsSolver.Config;
+namespace WondrousTailsSolver;
 
 /// <summary>
 /// Class that represents configuration data for EzWondrousTails.
 /// </summary>
-public class Configuration : IPluginConfiguration
-{
+public class Configuration : IPluginConfiguration {
     /// <summary>
     /// The color to use to set the border of the WondrousTails task.
     /// </summary>
