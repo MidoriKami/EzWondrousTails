@@ -4,49 +4,14 @@ using Dalamud.Plugin.Services;
 
 namespace WondrousTailsSolver;
 
-/// <summary>
-/// Dalamud and plugin services.
-/// </summary>
-internal class Service {
-    /// <summary>
-    /// Gets the Dalamud plugin interface.
-    /// </summary>
-    [PluginService]
-    internal static IDalamudPluginInterface Interface { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud data manager.
-    /// </summary>
-    [PluginService]
-    internal static IDataManager DataManager { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud Client State.
-    /// </summary>
-    [PluginService]
-    internal static IClientState ClientState { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud Condition class.
-    /// </summary>
-    [PluginService]
-    internal static ICondition Condition { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud Hooker class.
-    /// </summary>
-    [PluginService]
-    internal static IGameInteropProvider Hooker { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud AddonLifecycle class.
-    /// </summary>
-    [PluginService]
-    internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
-
-    /// <summary>
-    /// Gets the Dalamud Service.PluginLog class.
-    /// </summary>
-    [PluginService]
-    internal static IPluginLog PluginLog { get; private set; } = null!;
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+public class Service {
+    [PluginService] public static IDalamudPluginInterface Interface { get; set; }
+    [PluginService] public static IDataManager DataManager { get; set; }
+    [PluginService] public static IAddonLifecycle AddonLifecycle { get; set; }
+    [PluginService] public static IPluginLog PluginLog { get; set; }
+    [PluginService] public static IGameGui GameGui { get; set; }
+    [PluginService] public static IAddonEventManager AddonEventManager { get; set; }
+    [PluginService] public static ICondition Condition { get; set; }
+    [PluginService] public static IClientState ClientState { get; set; }
 }

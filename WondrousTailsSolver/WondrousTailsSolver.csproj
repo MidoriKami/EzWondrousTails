@@ -6,6 +6,7 @@
     <PackageProjectUrl>https://github.com/MidoriKami/EzWondrousTails</PackageProjectUrl>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\KamiLib\KamiLib.csproj" />
     <ProjectReference Include="..\KamiToolKit\KamiToolKit.csproj" />
   </ItemGroup>
 </Project>

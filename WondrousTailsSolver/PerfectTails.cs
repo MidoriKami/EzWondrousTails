@@ -1,17 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.Text.SeStringHandling;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
 namespace WondrousTailsSolver;
 
 /// <summary>
 /// Minigame solver.
 /// </summary>
-internal sealed partial class PerfectTails {
+public sealed partial class PerfectTails {
     private static readonly Random Random = new();
-    private readonly Dictionary<int, long[]> possibleBoards = new();
-    private readonly Dictionary<int, double[]> sampleProbabilities = new();
+    private readonly Dictionary<int, long[]> possibleBoards = [];
+    private readonly Dictionary<int, double[]> sampleProbabilities = [];
 
+    private readonly bool[] gameState = new bool[16];
+    
     /// <summary>
     /// Initializes a new instance of the <see cref="PerfectTails"/> class.
     /// </summary>
@@ -20,17 +24,9 @@ internal sealed partial class PerfectTails {
         this.CalculateSamples();
     }
 
-    /// <summary>
-    /// Gets the error response.
-    /// </summary>
-    public static double[] Error { get; } = [-1, -1, -1];
+    private static double[] Error { get; } = [-1, -1, -1];
 
-    /// <summary>
-    /// Solve the board.
-    /// </summary>
-    /// <param name="cells">Current board state.</param>
-    /// <returns>Array of probabilities.</returns>
-    public double[] Solve(bool[] cells) {
+    private double[] Solve(bool[] cells) {
         var counts = this.Values(cells);
 
         if (counts == null)
@@ -42,12 +38,7 @@ internal sealed partial class PerfectTails {
         return probabilities;
     }
 
-    /// <summary>
-    /// Get the average of all the potential solutions.
-    /// </summary>
-    /// <param name="stickersPlaced">Number of stickers placed.</param>
-    /// <returns>Sampled probabilities.</returns>
-    public double[] GetSample(int stickersPlaced) {
+    private double[] GetSample(int stickersPlaced) {
         return this.sampleProbabilities.GetValueOrDefault(stickersPlaced, Error);
     }
 
@@ -124,7 +115,7 @@ internal sealed partial class PerfectTails {
 /// <summary>
 /// Static calculations.
 /// </summary>
-internal sealed partial class PerfectTails {
+public sealed partial class PerfectTails {
     private static int CellsToMask(bool[] cells) {
         var mask = 0;
         for (var r = 0; r < 4; r++) {
@@ -157,4 +148,67 @@ internal sealed partial class PerfectTails {
 
     private static bool MaskHasDiag2(int mask)
         => Enumerable.Range(0, 4).All(i => MaskHasBit(mask, i, 3 - i));
+}
+
+/// <summary>
+/// Getting formatted results
+/// </summary>
+public sealed unsafe partial class PerfectTails {
+    public SeString SolveAndGetProbabilitySeString() {
+        var stickersPlaced = PlayerState.Instance()->WeeklyBingoNumPlacedStickers;
+
+        // > 9 returns Error {-1,-1,-1} by the solver
+        var values = Solve(this.gameState);
+
+        double[]? samples = null;
+        if (stickersPlaced is > 0 and <= 7)
+            samples = GetSample(stickersPlaced);
+
+        if (values == Error) {
+            return new SeStringBuilder()
+                .AddText("Line Chances: ")
+                .AddUiForeground("error ", 704)
+                .AddUiForeground("error ", 704)
+                .AddUiForeground("error ", 704)
+                .Build();
+        }
+
+        var valuePayloads = this.StringFormatDoubles(values);
+        var seString = new SeStringBuilder()
+            .AddText("Line Chances: ");
+
+        if (samples != null) {
+            foreach (var (value, sample, valuePayload) in Enumerable.Range(0, values.Length).Select(i => (values[i], samples[i], valuePayloads[i]))) {
+                const double bound = 0.05;
+                var sampleBoundLower = Math.Max(0, sample - bound);
+                // var sampleBoundUpper = Math.Min(1, sample + bound);
+
+                if (Math.Abs(value - 1) < 0.1f)
+                    seString.AddUiGlow(valuePayload, 2);
+                else if (value < 1 && value >= sample)
+                    seString.AddUiForeground(valuePayload, 67);
+                else if (sample > value && value > sampleBoundLower)
+                    seString.AddUiForeground(valuePayload, 66);
+                else if (sampleBoundLower > value && value > 0)
+                    seString.AddUiForeground(valuePayload, 561);
+                else if (value == 0)
+                    seString.AddUiForeground(valuePayload, 704);
+                else
+                    seString.AddText(valuePayload);
+
+                seString.AddText("  ");
+            }
+
+            seString.AddText("\rShuffle Average: ");
+            seString.AddText(string.Join(" ", this.StringFormatDoubles(samples)));
+        }
+        else {
+            seString.AddText(string.Join(" ", valuePayloads));
+        }
+        
+        return seString.Build();
+    }
+
+    private string[] StringFormatDoubles(IEnumerable<double> values)
+        => values.Select(v => $"{v * 100:F2}%").ToArray();
 }
