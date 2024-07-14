@@ -46,7 +46,7 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
         if (existingTextNode is null) return;
         
         // Shrink existing node, the game doesn't need that space anyways.
-        existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() / 2.0f));
+        existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 2.0f / 3.0f));
         
         // Add new custom text node to ui
         AddTextNode(existingTextNode, addonWeeklyBingo);
