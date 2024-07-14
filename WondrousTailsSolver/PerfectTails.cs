@@ -14,7 +14,7 @@ public sealed partial class PerfectTails {
     private readonly Dictionary<int, long[]> possibleBoards = [];
     private readonly Dictionary<int, double[]> sampleProbabilities = [];
 
-    private readonly bool[] gameState = new bool[16];
+    public readonly bool[] GameState = new bool[16];
     
     /// <summary>
     /// Initializes a new instance of the <see cref="PerfectTails"/> class.
@@ -158,7 +158,7 @@ public sealed unsafe partial class PerfectTails {
         var stickersPlaced = PlayerState.Instance()->WeeklyBingoNumPlacedStickers;
 
         // > 9 returns Error {-1,-1,-1} by the solver
-        var values = Solve(this.gameState);
+        var values = Solve(this.GameState);
 
         double[]? samples = null;
         if (stickersPlaced is > 0 and <= 7)

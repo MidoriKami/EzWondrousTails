@@ -73,6 +73,10 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
     
     private void OnAddonRefresh(AddonEvent type, AddonArgs args) {
         foreach (var index in Enumerable.Range(0, 16)) {
+            System.PerfectTails.GameState[index] = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(index);
+        }
+        
+        foreach (var index in Enumerable.Range(0, 16)) {
             ref var borderNode = ref currentDutyBorder[index];
             if (borderNode is null) continue;
 
