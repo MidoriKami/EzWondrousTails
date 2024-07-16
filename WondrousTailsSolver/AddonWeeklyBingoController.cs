@@ -79,8 +79,15 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
         foreach (var index in Enumerable.Range(0, 16)) {
             ref var borderNode = ref currentDutyBorder[index];
             if (borderNode is null) continue;
-
+            
             borderNode.IsVisible = IsCurrentDuty(index);
+
+            // Re-adjust positions, there may be a race condition moving things around
+            var dutySlot = ((AddonWeeklyBingo*)args.Addon)->DutySlotList[index];
+            var buttonNode = dutySlot.DutyButton->OwnerNode;
+            if (buttonNode is null) continue;
+
+            borderNode.Position = new Vector2(buttonNode->X, buttonNode->Y);
         }
 
         if (probabilityTextNode is not null) {
