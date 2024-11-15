@@ -1,53 +1,46 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 
 namespace WondrousTailsSolver;
 
 /// <summary>
 /// Helper class for converting Task ID's into Zone Lists.
 /// </summary>
-public static class TaskLookup {
-    /// <summary>
-    /// Processes Wondrous Tails TaskID into a list of zones.
-    /// </summary>
-    /// <param name="id">Wondrous Tails TaskID.</param>
-    /// <returns>List of TerritoryType row Id's.</returns>
-	public static List<uint> GetInstanceListFromId(uint id) {
-		var bingoOrderData = Service.DataManager.GetExcelSheet<WeeklyBingoOrderData>()!.GetRow(id);
-		if (bingoOrderData is null) return [];
+internal static class TaskLookup {
+	public static List<uint> GetInstanceListFromId(uint orderDataId) {
+		var bingoOrderData = Service.DataManager.GetExcelSheet<WeeklyBingoOrderData>().GetRow(orderDataId);
         
 		switch (bingoOrderData.Type) {
 			// Specific Duty
 			case 0:
-				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-					.Where(c => c.Content == bingoOrderData.Data)
+				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()
+					.Where(c => c.Content.RowId == bingoOrderData.Data.RowId)
 					.OrderBy(row => row.SortKey)
-					.Select(c => c.TerritoryType.Row)
+					.Select(c => c.TerritoryType.RowId)
 					.ToList();
             
 			// Specific Level Dungeon
 			case 1:
-				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-					.Where(m => m.ContentType.Row is 2)
-					.Where(m => m.ClassJobLevelRequired == bingoOrderData.Data)
+				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()
+					.Where(m => m.ContentType.RowId is 2)
+					.Where(m => m.ClassJobLevelRequired == bingoOrderData.Data.RowId)
 					.OrderBy(row => row.SortKey)
-					.Select(m => m.TerritoryType.Row)
+					.Select(m => m.TerritoryType.RowId)
 					.ToList();
             
 			// Level Range Dungeon
 			case 2:
-				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-					.Where(m => m.ContentType.Row is 2)
-					.Where(m => m.ClassJobLevelRequired >= bingoOrderData.Data - (bingoOrderData.Data > 50 ? 9 : 49) && m.ClassJobLevelRequired <= bingoOrderData.Data - 1)
+				return Service.DataManager.GetExcelSheet<ContentFinderCondition>()
+					.Where(m => m.ContentType.RowId is 2)
+					.Where(m => m.ClassJobLevelRequired >= bingoOrderData.Data.RowId - (bingoOrderData.Data.RowId > 50 ? 9 : 49) && m.ClassJobLevelRequired <= bingoOrderData.Data.RowId - 1)
 					.OrderBy(row => row.SortKey)
-					.Select(m => m.TerritoryType.Row)
+					.Select(m => m.TerritoryType.RowId)
 					.ToList();
             
 			// Special categories
 			case 3:
-				return bingoOrderData.Unknown5 switch
+				return bingoOrderData.Unknown1 switch
 				{
 					// Treasure Map Instances are Not Supported
 					1 => [],
@@ -56,10 +49,10 @@ public static class TaskLookup {
 					2 => [],
                     
 					// Deep Dungeons
-					3 => Service.DataManager.GetExcelSheet<ContentFinderCondition>()!
-						.Where(m => m.ContentType.Row is 21)
+					3 => Service.DataManager.GetExcelSheet<ContentFinderCondition>()
+						.Where(m => m.ContentType.RowId is 21)
 						.OrderBy(row => row.SortKey)
-						.Select(m => m.TerritoryType.Row)
+						.Select(m => m.TerritoryType.RowId)
 						.ToList(),
                     
 					_ => [],
@@ -67,8 +60,7 @@ public static class TaskLookup {
             
 			// Multi-instance raids
 			case 4:
-				return bingoOrderData.Data switch
-				{
+				return bingoOrderData.Data.RowId switch {
 					// Binding Coil, Second Coil, Final Coil
 					2 => [ 241, 242, 243, 244, 245 ],
 					3 => [ 355, 356, 357, 358 ],
@@ -132,7 +124,7 @@ public static class TaskLookup {
 				};
 		}
         
-		Service.PluginLog.Information($"[WondrousTails] Unrecognized ID: {id}");
+		Service.PluginLog.Information($"[WondrousTails] Unrecognized ID: {orderDataId}");
 		return [];
 	}
 }

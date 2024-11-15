@@ -12,7 +12,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 
 namespace WondrousTailsSolver;
 
@@ -119,7 +119,7 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
             var dutySlot = addonWeeklyBingo->DutySlotList[index];
             var buttonNode = dutySlot.DutyButton->OwnerNode;
 
-            var newBorderNode = new NineGridNode {
+            var newBorderNode = new SimpleNineGridNode {
                 Size = new Vector2(buttonNode->GetWidth(), buttonNode->GetHeight()) + new Vector2(0.0f, 4.0f),
                 Position = new Vector2(buttonNode->GetXFloat(), buttonNode->GetYFloat()),
                 Color = System.Configuration.CurrentDutyColor,
@@ -147,8 +147,8 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
             var dutiesForTask = TaskLookup.GetInstanceListFromId(bingoData);
 
             var territoryType = dutiesForTask.FirstOrDefault();
-            var cfc = Service.DataManager.GetExcelSheet<ContentFinderCondition>()!.FirstOrDefault(cfc => cfc.TerritoryType.Row == territoryType);
-            if (cfc == null) return;
+            var cfc = Service.DataManager.GetExcelSheet<ContentFinderCondition>().FirstOrDefault(cfc => cfc.TerritoryType.RowId == territoryType);
+            if (cfc.RowId is 0) return;
 
             AgentContentsFinder.Instance()->OpenRegularDuty(cfc.RowId);
         }
