@@ -124,8 +124,8 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
                 Position = new Vector2(buttonNode->GetXFloat(), buttonNode->GetYFloat()),
                 Color = System.Configuration.CurrentDutyColor,
                 NodeID = dutySlot.ResNode1->NodeId + 100,
-                TextureCoordinates = new Vector2(2.0f, 2.0f),
-                TextureSize = new Vector2(144.0f, 96.0f),
+                TextureCoordinates = new Vector2(1.0f, 1.0f),
+                TextureSize = new Vector2(72.0f, 48.0f),
                 IsVisible = IsCurrentDuty(index),
             };
             
