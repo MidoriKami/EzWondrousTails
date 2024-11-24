@@ -1,10 +1,11 @@
 <Project Sdk="Dalamud.NET.Sdk/11.0.0">
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
-    <Version>3.2.0.2</Version>
+    <Version>3.2.0.3</Version>
     <Authors>daemitus,MidoriKami</Authors>
     <PackageProjectUrl>https://github.com/MidoriKami/EzWondrousTails</PackageProjectUrl>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\KamiLib\KamiLib.csproj" />
     <ProjectReference Include="..\KamiToolKit\KamiToolKit.csproj" />
