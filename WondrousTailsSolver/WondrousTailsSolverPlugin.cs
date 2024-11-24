@@ -14,7 +14,7 @@ public sealed class WondrousTailsSolverPlugin : IDalamudPlugin {
         System.NativeController = new NativeController(pluginInterface);
         
         System.WindowManager = new WindowManager(pluginInterface);
-        System.WindowManager.AddWindow(new ConfigurationWindow(System.Configuration), WindowFlags.IsConfigWindow | WindowFlags.RequireLoggedIn | WindowFlags.AllowInPvP);
+        System.WindowManager.AddWindow(new ConfigurationWindow(System.Configuration), WindowFlags.IsConfigWindow | WindowFlags.RequireLoggedIn);
 
         System.AddonWeeklyBingoController = new AddonWeeklyBingoController();
     }
