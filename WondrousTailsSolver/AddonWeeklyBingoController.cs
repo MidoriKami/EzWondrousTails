@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiLib.Classes;
 using KamiToolKit.Classes;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
@@ -144,7 +145,7 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
         var bingoData = PlayerState.Instance()->WeeklyBingoOrderData[tileIndex];
         
         if (selectedTask is PlayerState.WeeklyBingoTaskStatus.Open) {
-            var dutiesForTask = TaskLookup.GetInstanceListFromId(bingoData);
+            var dutiesForTask = WondrousTailsTaskResolver.GetTerritoriesFromOrderId(Service.DataManager, bingoData);
 
             var territoryType = dutiesForTask.FirstOrDefault();
             var cfc = Service.DataManager.GetExcelSheet<ContentFinderCondition>().FirstOrDefault(cfc => cfc.TerritoryType.RowId == territoryType);
@@ -186,7 +187,7 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
         if (!Service.Condition.Any(ConditionFlag.BoundByDuty, ConditionFlag.BoundByDuty56, ConditionFlag.BoundByDuty95)) return false;
 
         var currentTaskId = PlayerState.Instance()->WeeklyBingoOrderData[index];
-        var taskList = TaskLookup.GetInstanceListFromId(currentTaskId);
+        var taskList = WondrousTailsTaskResolver.GetTerritoriesFromOrderId(Service.DataManager, currentTaskId);
         
         return taskList.Contains(Service.ClientState.TerritoryType);
     }
