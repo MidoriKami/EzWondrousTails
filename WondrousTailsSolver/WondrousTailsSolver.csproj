@@ -1,7 +1,7 @@
 <Project Sdk="Dalamud.NET.Sdk/11.0.0">
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
-    <Version>3.2.0.3</Version>
+    <Version>3.2.0.4</Version>
     <Authors>daemitus,MidoriKami</Authors>
     <PackageProjectUrl>https://github.com/MidoriKami/EzWondrousTails</PackageProjectUrl>
   </PropertyGroup>
