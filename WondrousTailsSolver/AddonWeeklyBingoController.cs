@@ -125,12 +125,11 @@ public unsafe class AddonWeeklyBingoController : IDisposable {
                 Position = new Vector2(buttonNode->GetXFloat(), buttonNode->GetYFloat()),
                 Color = System.Configuration.CurrentDutyColor,
                 NodeID = dutySlot.ResNode1->NodeId + 100,
+                TexturePath = "ui/uld/WeeklyBingo_hr1.tex",
                 TextureCoordinates = new Vector2(1.0f, 1.0f),
                 TextureSize = new Vector2(72.0f, 48.0f),
                 IsVisible = IsCurrentDuty(index),
             };
-            
-            newBorderNode.LoadTexture("ui/uld/WeeklyBingo_hr1.tex");
                 
             currentDutyBorder[index] = newBorderNode;
             System.NativeController.AttachToAddon(newBorderNode, (AtkUnitBase*)addonWeeklyBingo, (AtkResNode*)buttonNode, NodePosition.AfterTarget);
