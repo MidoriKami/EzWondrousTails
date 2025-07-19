@@ -5,17 +5,6 @@ VisualStudioVersion = 17.0.31423.177
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WondrousTailsSolver", "WondrousTailsSolver\WondrousTailsSolver.csproj", "{E4BEAAE4-8522-44B6-8754-9560475D20D3}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7EDD1F8C-4647-45DA-A5AF-DEF41D07F0E2}"
-	ProjectSection(SolutionItems) = preProject
-		.editorconfig = .editorconfig
-		.gitignore = .gitignore
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github Actions", "Github Actions", "{3371BF8A-1889-4F87-91D6-C6A75BA0A73D}"
-	ProjectSection(SolutionItems) = preProject
-		.github\workflows\build.yml = .github\workflows\build.yml
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KamiToolKit", "KamiToolKit\KamiToolKit.csproj", "{588AF486-BF20-4BDD-A3FC-08F62608B89C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KamiLib", "KamiLib\KamiLib.csproj", "{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}"
