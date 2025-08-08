@@ -9,6 +9,7 @@ using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
+using Serilog;
 
 namespace WondrousTailsSolver;
 
@@ -56,9 +57,9 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
         if (probabilityTextNode is not null) {
             var existingTextNode = addon->GetTextNodeById(34);
             if (existingTextNode is null) return;
-            // remove lines after the first one
             var seString = existingTextNode->GetText().ExtractText();
-            var splitText = seString.Split("\n")[0];
+            var split = seString.Split(".");
+            string splitText = split.Length < 2 ? splitText = seString.Split("。")[0] + "。" : split[0] + ". ";
             existingTextNode->SetText(splitText);
 
             probabilityTextNode.Text = System.PerfectTails.SolveAndGetProbabilitySeString();
