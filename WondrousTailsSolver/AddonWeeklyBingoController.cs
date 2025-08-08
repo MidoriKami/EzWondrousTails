@@ -1,13 +1,17 @@
 ﻿using System.Linq;
 using System.Numerics;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
+using Serilog;
 
 namespace WondrousTailsSolver;
 
@@ -17,6 +21,7 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
     public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) : base(pluginInterface) {
         OnAttach += AttachNodes;
         OnRefresh += AddonRefresh;
+        OnUpdate += AddonRefresh;
         OnDetach += DetachNodes;
         Enable();
     }
@@ -27,7 +32,7 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
         
         // Shrink existing node, the game doesn't need that space anyway.
         existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 2.0f / 3.0f));
-        
+
         // Add new custom text node to ui
         probabilityTextNode = new TextNode {
             NodeFlags = NodeFlags.Enabled | NodeFlags.Visible,
@@ -52,6 +57,13 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
         }
 
         if (probabilityTextNode is not null) {
+            var existingTextNode = addon->GetTextNodeById(34);
+            if (existingTextNode is null) return;
+            // remove lines after the first one
+            var seString = existingTextNode->GetText().ExtractText();
+            var splitText = seString.Split("\n")[0];
+            existingTextNode->SetText(splitText);
+
             probabilityTextNode.Text = System.PerfectTails.SolveAndGetProbabilitySeString();
         }
     }
