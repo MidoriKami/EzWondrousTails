@@ -82,8 +82,6 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
                 {
                     newString.Add(nodeText.Payloads[index]);
                 }
-
-                existingTextNode->TextFlags |= TextFlags.WordWrap;
                 existingTextNode->SetText(newString.Encode());
             }
 
