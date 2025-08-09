@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using System.Numerics;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin;
-using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -9,7 +9,6 @@ using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
-using Serilog;
 
 namespace WondrousTailsSolver;
 
@@ -57,10 +56,36 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
         if (probabilityTextNode is not null) {
             var existingTextNode = addon->GetTextNodeById(34);
             if (existingTextNode is null) return;
-            var seString = existingTextNode->GetText().ExtractText();
-            var split = seString.Split(".");
-            string splitText = split.Length < 2 ? splitText = seString.Split("。")[0] + "。" : split[0] + ". ";
-            existingTextNode->SetText(splitText);
+            var nodeText = SeString.Parse(existingTextNode->NodeText);
+
+            var lineBreakIndex = -1;
+            for (var index = 0; index < nodeText.Payloads.Count; index++)
+            {
+                if (index > 0)
+                {
+                    var previousPayload = nodeText.Payloads[index - 1];
+                    var payload = nodeText.Payloads[index];
+
+                    if (previousPayload.Type is PayloadType.NewLine && payload.Type is PayloadType.NewLine)
+                    {
+                        lineBreakIndex = index - 1;
+                        break;
+                    }
+                }
+            }
+
+            if (lineBreakIndex is not -1)
+            {
+                var newString = new SeStringBuilder();
+
+                for (var index = 0; index < lineBreakIndex; index++)
+                {
+                    newString.Add(nodeText.Payloads[index]);
+                }
+
+                existingTextNode->TextFlags |= TextFlags.WordWrap;
+                existingTextNode->SetText(newString.Encode());
+            }
 
             probabilityTextNode.Text = System.PerfectTails.SolveAndGetProbabilitySeString();
         }
