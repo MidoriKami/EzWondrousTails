@@ -1,13 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31423.177
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WondrousTailsSolver", "WondrousTailsSolver\WondrousTailsSolver.csproj", "{E4BEAAE4-8522-44B6-8754-9560475D20D3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KamiToolKit", "KamiToolKit\KamiToolKit.csproj", "{588AF486-BF20-4BDD-A3FC-08F62608B89C}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KamiLib", "KamiLib\KamiLib.csproj", "{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,14 +31,6 @@ Global
 		{588AF486-BF20-4BDD-A3FC-08F62608B89C}.Release|Any CPU.Build.0 = Debug|x64
 		{588AF486-BF20-4BDD-A3FC-08F62608B89C}.Release|x64.ActiveCfg = Debug|x64
 		{588AF486-BF20-4BDD-A3FC-08F62608B89C}.Release|x64.Build.0 = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Debug|Any CPU.Build.0 = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Debug|x64.ActiveCfg = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Debug|x64.Build.0 = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Release|Any CPU.ActiveCfg = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Release|Any CPU.Build.0 = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Release|x64.ActiveCfg = Debug|x64
-		{A37E7E5C-1BE1-4F26-8C37-7897D8E27952}.Release|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
