@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit;
 using KamiToolKit.Classes;
+using KamiToolKit.Classes.Controllers;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
 
@@ -15,7 +16,8 @@ namespace WondrousTailsSolver;
 public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBingo> {
     private TextNode? probabilityTextNode;
 
-    public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) : base(pluginInterface) {
+    public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) : base("WeeklyBingo") {
+        KamiToolKitLibrary.Initialize(pluginInterface);
         OnAttach += AttachNodes;
         OnRefresh += AddonRefresh;
         OnUpdate += AddonRefresh;
@@ -26,6 +28,7 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
     private void AttachNodes(AddonWeeklyBingo* addon) {
         var existingTextNode = addon->GetTextNodeById(34);
         if (existingTextNode is null) return;
+        
         
         // Shrink existing node, the game doesn't need that space anyway.
         existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 2.0f / 3.0f));
@@ -42,10 +45,10 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
             LineSpacing = existingTextNode->LineSpacing,
             CharSpacing = existingTextNode->CharSpacing,
             TextFlags = TextFlags.MultiLine | (TextFlags)existingTextNode->TextFlags,
-            Text = System.PerfectTails.SolveAndGetProbabilitySeString(),
+            String = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue,
         };
 
-        System.NativeController.AttachNode(probabilityTextNode, (AtkResNode*)existingTextNode, NodePosition.AfterTarget);
+        probabilityTextNode.AttachNode((AtkResNode*)existingTextNode, NodePosition.AfterTarget);
     }
     
     private void AddonRefresh(AddonWeeklyBingo* addon) {
@@ -85,7 +88,7 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
                 existingTextNode->SetText(newString.Encode());
             }
 
-            probabilityTextNode.Text = System.PerfectTails.SolveAndGetProbabilitySeString();
+            probabilityTextNode.String = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue;
         }
     }
     
@@ -95,9 +98,7 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
             existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 3.0f / 2.0f));
         }
 
-        System.NativeController.DetachNode(probabilityTextNode, () => {
-            probabilityTextNode?.Dispose();
-            probabilityTextNode = null;
-        });
+        probabilityTextNode?.Dispose();
+        probabilityTextNode = null;
     }
 }
