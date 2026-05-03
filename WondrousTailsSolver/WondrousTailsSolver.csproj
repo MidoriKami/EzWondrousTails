@@ -1,14 +1,37 @@
-﻿<Project Sdk="Dalamud.NET.Sdk/14.0.1">
+<Project Sdk="Dalamud.NET.Sdk/14.0.1">
   <PropertyGroup>
     <PackageId>WondrousTailsSolver</PackageId>
+    <Name>&#x5929;&#x4E66;&#x6982;&#x7387;&#x52A9;&#x624B;</Name>
+    <InternalName>WondrousTailsSolver</InternalName>
     <Version>3.2.2.6</Version>
     <Authors>daemitus,MidoriKami</Authors>
-    <PackageProjectUrl>https://github.com/MidoriKami/EzWondrousTails</PackageProjectUrl>
-	  <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <Punchline>&#x5929;&#x4E66;&#x754C;&#x9762;&#x5B9E;&#x65F6;&#x663E;&#x793A;&#x8FDE;&#x7EBF;&#x6982;&#x7387;&#x3002; / Adds row probabilities to the Wondrous Tails display.</Punchline>
+    <Description>&#x5728;&#x5929;&#x4E66;&#x754C;&#x9762;&#x5B9E;&#x65F6;&#x663E;&#x793A;1&#x7EBF;/2&#x7EBF;/3&#x7EBF;&#x6982;&#x7387;&#xFF0C;&#x5E76;&#x63D0;&#x4F9B;&#x91CD;&#x6392;&#x540E;&#x7684;&#x5E73;&#x5747;&#x53C2;&#x8003;&#x3002;&#x0A;This plugin prints the probability of getting a row in Wondrous Tails to the in-game display along with the average probability of what would happen if you shuffled.</Description>
+    <Tags>wondrous-tails;probability;utility</Tags>
+    <DalamudApiLevel>15</DalamudApiLevel>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <OutputPath>output\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KamiToolKit\KamiToolKit.csproj" />
   </ItemGroup>
 </Project>
-

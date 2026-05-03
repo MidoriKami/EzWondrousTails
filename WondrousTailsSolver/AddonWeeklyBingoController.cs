@@ -1,5 +1,5 @@
-﻿using System.Linq;
-using System.Numerics;
+using System;
+using System.Linq;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
@@ -8,13 +8,14 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Classes.Controllers;
-using KamiToolKit.Extensions;
-using KamiToolKit.Nodes;
 
 namespace WondrousTailsSolver;
 
 public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBingo> {
-    private TextNode? probabilityTextNode;
+    private uint targetTextNodeId;
+    private ushort originalTextNodeHeight;
+    private TextFlags originalTextFlags;
+    private string lastInjectedText = string.Empty;
 
     public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) : base("WeeklyBingo") {
         KamiToolKitLibrary.Initialize(pluginInterface);
@@ -26,79 +27,109 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
     }
 
     private void AttachNodes(AddonWeeklyBingo* addon) {
-        var existingTextNode = addon->GetTextNodeById(34);
+        var existingTextNode = GetTargetTextNode(addon);
         if (existingTextNode is null) return;
-        
-        
-        // Shrink existing node, the game doesn't need that space anyway.
-        existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 2.0f / 3.0f));
 
-        // Add new custom text node to ui
-        probabilityTextNode = new TextNode {
-            NodeFlags = NodeFlags.Enabled | NodeFlags.Visible,
-            Size = new Vector2(existingTextNode->GetWidth(), existingTextNode->GetHeight()),
-            Position = new Vector2(existingTextNode->GetXFloat(), existingTextNode->GetYFloat() + existingTextNode->GetHeight()),
-            TextColor = existingTextNode->TextColor.ToVector4(),
-            TextOutlineColor = existingTextNode->EdgeColor.ToVector4(),
-            BackgroundColor = existingTextNode->BackgroundColor.ToVector4(),
-            FontSize = existingTextNode->FontSize,
-            LineSpacing = existingTextNode->LineSpacing,
-            CharSpacing = existingTextNode->CharSpacing,
-            TextFlags = TextFlags.MultiLine | (TextFlags)existingTextNode->TextFlags,
-            String = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue,
-        };
+        targetTextNodeId = existingTextNode->AtkResNode.NodeId;
+        originalTextNodeHeight = existingTextNode->GetHeight();
+        originalTextFlags = (TextFlags)existingTextNode->TextFlags;
+        existingTextNode->TextFlags |= TextFlags.MultiLine;
 
-        probabilityTextNode.AttachNode((AtkResNode*)existingTextNode, NodePosition.AfterTarget);
+        var calculatedExtraHeight = (ushort)(existingTextNode->LineSpacing * 3);
+        var extraHeight = calculatedExtraHeight > 24 ? calculatedExtraHeight : (ushort)24;
+        existingTextNode->SetHeight((ushort)(originalTextNodeHeight + extraHeight));
+
+        AddonRefresh(addon);
     }
-    
+
     private void AddonRefresh(AddonWeeklyBingo* addon) {
         foreach (var index in Enumerable.Range(0, 16)) {
             System.PerfectTails.GameState[index] = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(index);
         }
 
-        if (probabilityTextNode is not null) {
-            var existingTextNode = addon->GetTextNodeById(34);
-            if (existingTextNode is null) return;
-            var nodeText = SeString.Parse(existingTextNode->NodeText);
+        var existingTextNode = GetTargetTextNode(addon);
+        if (existingTextNode is null) return;
 
-            var lineBreakIndex = -1;
-            for (var index = 0; index < nodeText.Payloads.Count; index++)
-            {
-                if (index > 0)
-                {
-                    var previousPayload = nodeText.Payloads[index - 1];
-                    var payload = nodeText.Payloads[index];
-
-                    if (previousPayload.Type is PayloadType.NewLine && payload.Type is PayloadType.NewLine)
-                    {
-                        lineBreakIndex = index - 1;
-                        break;
-                    }
-                }
+        var baseText = SeString.Parse(existingTextNode->NodeText).TextValue;
+        if (!string.IsNullOrEmpty(lastInjectedText)) {
+            var injectedIndex = baseText.IndexOf(lastInjectedText, StringComparison.Ordinal);
+            if (injectedIndex >= 0) {
+                baseText = baseText[..injectedIndex];
             }
-
-            if (lineBreakIndex is not -1)
-            {
-                var newString = new SeStringBuilder();
-
-                for (var index = 0; index < lineBreakIndex; index++)
-                {
-                    newString.Add(nodeText.Payloads[index]);
-                }
-                existingTextNode->SetText(newString.Encode());
-            }
-
-            probabilityTextNode.String = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue;
         }
+
+        baseText = baseText.TrimEnd('\r', '\n', ' ');
+        lastInjectedText = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue;
+
+        existingTextNode->SetText(string.IsNullOrEmpty(baseText)
+            ? lastInjectedText
+            : $"{baseText}\r{lastInjectedText}");
     }
-    
+
     private void DetachNodes(AddonWeeklyBingo* addon) {
-        var existingTextNode = addon->GetTextNodeById(34);
+        var existingTextNode = GetTargetTextNode(addon);
         if (existingTextNode is not null) {
-            existingTextNode->SetHeight((ushort)(existingTextNode->GetHeight() * 3.0f / 2.0f));
+            var baseText = SeString.Parse(existingTextNode->NodeText).TextValue;
+            if (!string.IsNullOrEmpty(lastInjectedText)) {
+                var injectedIndex = baseText.IndexOf(lastInjectedText, StringComparison.Ordinal);
+                if (injectedIndex >= 0) {
+                    baseText = baseText[..injectedIndex].TrimEnd('\r', '\n', ' ');
+                    existingTextNode->SetText(baseText);
+                }
+            }
+
+            if (originalTextNodeHeight > 0) {
+                existingTextNode->SetHeight(originalTextNodeHeight);
+            }
+
+            existingTextNode->TextFlags = originalTextFlags;
         }
 
-        probabilityTextNode?.Dispose();
-        probabilityTextNode = null;
+        targetTextNodeId = 0;
+        originalTextNodeHeight = 0;
+        originalTextFlags = 0;
+        lastInjectedText = string.Empty;
+    }
+
+    private AtkTextNode* GetTargetTextNode(AddonWeeklyBingo* addon) {
+        if (targetTextNodeId != 0) {
+            var cachedNode = addon->GetTextNodeById(targetTextNodeId);
+            if (IsCandidateNode(cachedNode)) {
+                return cachedNode;
+            }
+        }
+
+        var textNode = addon->GetTextNodeById(34);
+        if (IsCandidateNode(textNode)) {
+            return textNode;
+        }
+
+        AtkTextNode* bestNode = null;
+        foreach (var node in addon->UldManager.Nodes) {
+            if (node.Value is null || node.Value->Type is not NodeType.Text) continue;
+
+            var candidate = (AtkTextNode*)node.Value;
+            if (!IsCandidateNode(candidate)) continue;
+
+            if (bestNode is null
+                || candidate->GetWidth() > bestNode->GetWidth()
+                || (candidate->GetWidth() == bestNode->GetWidth() && candidate->GetYFloat() < bestNode->GetYFloat())) {
+                bestNode = candidate;
+            }
+        }
+
+        return bestNode;
+    }
+
+    private static bool IsCandidateNode(AtkTextNode* node) {
+        if (node is null) return false;
+        if (node->NodeText.AsSpan().Length == 0) return false;
+
+        var text = SeString.Parse(node->NodeText).TextValue.Trim();
+        if (string.IsNullOrEmpty(text)) return false;
+        if (node->GetWidth() < 250 || node->GetHeight() < 20) return false;
+
+        var y = node->GetYFloat();
+        return y is > 40 and < 220;
     }
 }

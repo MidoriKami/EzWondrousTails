@@ -15,19 +15,19 @@ public sealed partial class PerfectTails {
     private readonly Dictionary<int, double[]> sampleProbabilities = [];
 
     public readonly bool[] GameState = new bool[16];
-    
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PerfectTails"/> class.
     /// </summary>
     public PerfectTails() {
-        this.CalculateBoards(0, 0, 0, 0, 0);
-        this.CalculateSamples();
+        CalculateBoards(0, 0, 0, 0, 0);
+        CalculateSamples();
     }
 
     private static double[] Error { get; } = [-1, -1, -1];
 
     private double[] Solve(bool[] cells) {
-        var counts = this.Values(cells);
+        var counts = Values(cells);
 
         if (counts == null)
             return Error;
@@ -39,20 +39,20 @@ public sealed partial class PerfectTails {
     }
 
     private double[] GetSample(int stickersPlaced) {
-        return this.sampleProbabilities.GetValueOrDefault(stickersPlaced, Error);
+        return sampleProbabilities.GetValueOrDefault(stickersPlaced, Error);
     }
 
     private long[]? Values(bool[] cells) {
-        return this.possibleBoards.GetValueOrDefault(CellsToMask(cells));
+        return possibleBoards.GetValueOrDefault(CellsToMask(cells));
     }
 
     private long[] CalculateBoards(int mask, int numStickers, int numRows, int numCols, int numDiags) {
-        if (this.possibleBoards.TryGetValue(mask, out var result))
+        if (possibleBoards.TryGetValue(mask, out var result))
             return result;
 
         if (numStickers == 9) {
             var lines = numRows + numCols + numDiags;
-            return this.possibleBoards[mask] = [
+            return possibleBoards[mask] = [
                 1,
                 lines >= 1 ? 1 : 0,
                 lines >= 2 ? 1 : 0,
@@ -61,10 +61,10 @@ public sealed partial class PerfectTails {
         }
 
         if (numStickers > 9) {
-            return this.possibleBoards[mask] = [0, 0, 0, 0];
+            return possibleBoards[mask] = [0, 0, 0, 0];
         }
 
-        result = this.possibleBoards[mask] = [0, 0, 0, 0];
+        result = possibleBoards[mask] = [0, 0, 0, 0];
 
         for (var r = 0; r < 4; r++) {
             for (var c = 0; c < 4; c++) {
@@ -76,10 +76,9 @@ public sealed partial class PerfectTails {
                 var nCols = MaskHasCol(nMask, c) ? 1 : 0;
                 var nDiag1 = MaskHasDiag1(nMask) && r == c ? 1 : 0;
                 var nDiag2 = MaskHasDiag2(nMask) && r == 3 - c ? 1 : 0;
-                var nResult = this.CalculateBoards(nMask, numStickers + 1, numRows + nRows, numCols + nCols, numDiags + nDiag1 + nDiag2);
+                var nResult = CalculateBoards(nMask, numStickers + 1, numRows + nRows, numCols + nCols, numDiags + nDiag1 + nDiag2);
 
-                for (var i = 0; i < 4; i++)
-                {
+                for (var i = 0; i < 4; i++) {
                     result[i] += nResult[i];
                 }
             }
@@ -100,10 +99,10 @@ public sealed partial class PerfectTails {
                 foreach (var sampleIndex in sampleIndexes)
                     sampleState[sampleIndex] = true;
 
-                samples.Add(this.Solve(sampleState));
+                samples.Add(Solve(sampleState));
             }
 
-            this.sampleProbabilities[stickersPlaced] = [
+            sampleProbabilities[stickersPlaced] = [
                 Math.Round(samples.Average(s => s[0]), 4),
                 Math.Round(samples.Average(s => s[1]), 4),
                 Math.Round(samples.Average(s => s[2]), 4),
@@ -154,11 +153,18 @@ public sealed partial class PerfectTails {
 /// Getting formatted results
 /// </summary>
 public sealed unsafe partial class PerfectTails {
+    private static readonly string[] ProbabilityLabels = ["1\u7EBF", "2\u7EBF", "3\u7EBF"];
+
+    public void RefreshGameState() {
+        for (var index = 0; index < 16; index++) {
+            GameState[index] = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(index);
+        }
+    }
+
     public SeString SolveAndGetProbabilitySeString() {
         var stickersPlaced = PlayerState.Instance()->WeeklyBingoNumPlacedStickers;
 
-        // > 9 returns Error {-1,-1,-1} by the solver
-        var values = Solve(this.GameState);
+        var values = Solve(GameState);
 
         double[]? samples = null;
         if (stickersPlaced is > 0 and <= 7)
@@ -166,22 +172,24 @@ public sealed unsafe partial class PerfectTails {
 
         if (values == Error) {
             return new SeStringBuilder()
-                .AddText("Line Chances: ")
-                .AddUiForeground("error ", 704)
-                .AddUiForeground("error ", 704)
-                .AddUiForeground("error ", 704)
+                .AddText("\u8FDE\u7EBF\u6982\u7387\uFF1A")
+                .AddUiForeground("\u8BFB\u53D6\u5931\u8D25", 704)
                 .Build();
         }
 
-        var valuePayloads = this.StringFormatDoubles(values);
+        var valuePayloads = StringFormatDoubles(values);
         var seString = new SeStringBuilder()
-            .AddText("Line Chances: ");
+            .AddText("\u8FDE\u7EBF\u6982\u7387\uFF1A");
 
         if (samples != null) {
-            foreach (var (value, sample, valuePayload) in Enumerable.Range(0, values.Length).Select(i => (values[i], samples[i], valuePayloads[i]))) {
+            foreach (var index in Enumerable.Range(0, values.Length)) {
+                var value = values[index];
+                var sample = samples[index];
+                var valuePayload = valuePayloads[index];
                 const double bound = 0.05;
                 var sampleBoundLower = Math.Max(0, sample - bound);
-                // var sampleBoundUpper = Math.Min(1, sample + bound);
+
+                seString.AddText($"{ProbabilityLabels[index]} ");
 
                 if (Math.Abs(value - 1) < 0.1f)
                     seString.AddUiGlow(valuePayload, 2);
@@ -199,16 +207,24 @@ public sealed unsafe partial class PerfectTails {
                 seString.AddText("  ");
             }
 
-            seString.AddText("\rShuffle Average: ");
-            seString.AddText(string.Join(" ", this.StringFormatDoubles(samples)));
+            var samplePayloads = StringFormatDoubles(samples);
+            seString.AddText("\r\u91CD\u6392\u5E73\u5747\uFF1A");
+            for (var index = 0; index < samplePayloads.Length; index++) {
+                seString.AddText($"{ProbabilityLabels[index]} {samplePayloads[index]}  ");
+            }
         }
         else {
-            seString.AddText(string.Join(" ", valuePayloads));
+            for (var index = 0; index < valuePayloads.Length; index++) {
+                seString.AddText($"{ProbabilityLabels[index]} {valuePayloads[index]}  ");
+            }
         }
-        
+
         return seString.Build();
     }
 
     private string[] StringFormatDoubles(IEnumerable<double> values)
         => values.Select(v => $"{v * 100:F2}%").ToArray();
+
+    public string GetProbabilityText()
+        => SolveAndGetProbabilitySeString().TextValue.Replace('\r', '\n');
 }
