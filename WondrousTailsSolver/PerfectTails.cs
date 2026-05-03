@@ -225,6 +225,27 @@ public sealed unsafe partial class PerfectTails {
     private string[] StringFormatDoubles(IEnumerable<double> values)
         => values.Select(v => $"{v * 100:F2}%").ToArray();
 
+    public (string ProbabilityLine, string AverageLine) GetInlineDisplayLines() {
+        var stickersPlaced = PlayerState.Instance()->WeeklyBingoNumPlacedStickers;
+        var values = Solve(GameState);
+
+        if (values == Error) {
+            return ("\u8FDE\u7EBF\u6982\u7387\uFF1A\u8BFB\u53D6\u5931\u8D25", "\u91CD\u6392\u5E73\u5747\uFF1A-");
+        }
+
+        var valuePayloads = StringFormatDoubles(values);
+        var probabilityLine = "\u8FDE\u7EBF\u6982\u7387\uFF1A" + string.Join("  ", valuePayloads.Select((value, index) => $"{ProbabilityLabels[index]} {value}"));
+
+        if (stickersPlaced is > 0 and <= 7) {
+            var samples = GetSample(stickersPlaced);
+            var samplePayloads = StringFormatDoubles(samples);
+            var averageLine = "\u91CD\u6392\u5E73\u5747\uFF1A" + string.Join("  ", samplePayloads.Select((value, index) => $"{ProbabilityLabels[index]} {value}"));
+            return (probabilityLine, averageLine);
+        }
+
+        return (probabilityLine, "\u91CD\u6392\u5E73\u5747\uFF1A-");
+    }
+
     public string GetProbabilityText()
         => SolveAndGetProbabilitySeString().TextValue.Replace('\r', '\n');
 }

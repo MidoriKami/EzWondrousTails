@@ -30,8 +30,4 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <OutputPath>output\</OutputPath>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\KamiToolKit\KamiToolKit.csproj" />
-  </ItemGroup>
 </Project>

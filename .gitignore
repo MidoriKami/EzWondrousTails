@@ -1,6 +1,7 @@
 .vs/
 obj/
 bin/
+/WondrousTailsSolver/output/
 /.idea/.idea.WondrousTailsSolver/.idea/.gitignore
 /.idea/.idea.WondrousTailsSolver/.idea/.name
 /.idea/.idea.WondrousTailsSolver/.idea/encodings.xml

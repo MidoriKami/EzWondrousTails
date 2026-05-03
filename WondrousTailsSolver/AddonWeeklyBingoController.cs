@@ -1,45 +1,79 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit;
-using KamiToolKit.Classes;
-using KamiToolKit.Classes.Controllers;
 
 namespace WondrousTailsSolver;
 
-public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBingo> {
-    private uint targetTextNodeId;
-    private ushort originalTextNodeHeight;
-    private TextFlags originalTextFlags;
-    private string lastInjectedText = string.Empty;
+public unsafe class AddonWeeklyBingoController : IDisposable {
+    private const string AddonName = "WeeklyBingo";
+    private const string InstructionOriginalSegment = "\u7A7A\u767D\u5904\u8D34\u4E0A\u5370\u82B1";
+    private const string InstructionReplacementSegment = "\u7A7A\u767D\u5904\u8D34\u4E0A\u5370\u82B111111111111111111";
+    private const string ProbabilityPrefix = "\u8FDE\u7EBF\u6982\u7387\uFF1A";
+    private const string AveragePrefix = "\u91CD\u6392\u5E73\u5747\uFF1A";
 
-    public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) : base("WeeklyBingo") {
-        KamiToolKitLibrary.Initialize(pluginInterface);
-        OnAttach += AttachNodes;
-        OnRefresh += AddonRefresh;
-        OnUpdate += AddonRefresh;
-        OnDetach += DetachNodes;
-        Enable();
+    private uint instructionTextNodeId;
+    private string? instructionOriginalText;
+    private ushort instructionOriginalHeight;
+    private TextFlags instructionOriginalFlags;
+    private bool disposed;
+
+    public AddonWeeklyBingoController(IDalamudPluginInterface pluginInterface) {
+        DalamudServices.Initialize(pluginInterface);
+
+        DalamudServices.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonEvent);
+        DalamudServices.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonEvent);
+        DalamudServices.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, AddonName, OnAddonEvent);
+        DalamudServices.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnAddonEvent);
+        DalamudServices.AddonLifecycle.RegisterListener(AddonEvent.PostUpdate, AddonName, OnAddonEvent);
+
+        var currentAddon = GetOpenAddon();
+        if (currentAddon is not null) {
+            AddonRefresh(currentAddon);
+        }
     }
 
-    private void AttachNodes(AddonWeeklyBingo* addon) {
-        var existingTextNode = GetTargetTextNode(addon);
-        if (existingTextNode is null) return;
+    public void Dispose() {
+        if (disposed) {
+            return;
+        }
 
-        targetTextNodeId = existingTextNode->AtkResNode.NodeId;
-        originalTextNodeHeight = existingTextNode->GetHeight();
-        originalTextFlags = (TextFlags)existingTextNode->TextFlags;
-        existingTextNode->TextFlags |= TextFlags.MultiLine;
+        var currentAddon = GetOpenAddon();
+        if (currentAddon is not null) {
+            RestoreInstructionText(currentAddon);
+        }
 
-        var calculatedExtraHeight = (ushort)(existingTextNode->LineSpacing * 3);
-        var extraHeight = calculatedExtraHeight > 24 ? calculatedExtraHeight : (ushort)24;
-        existingTextNode->SetHeight((ushort)(originalTextNodeHeight + extraHeight));
+        DalamudServices.AddonLifecycle.UnregisterListener(OnAddonEvent);
 
-        AddonRefresh(addon);
+        instructionTextNodeId = 0;
+        instructionOriginalText = null;
+        instructionOriginalHeight = 0;
+        instructionOriginalFlags = 0;
+        disposed = true;
+    }
+
+    private void OnAddonEvent(AddonEvent type, AddonArgs args) {
+        var addon = (AddonWeeklyBingo*)args.Addon.Address;
+
+        switch (type) {
+            case AddonEvent.PostSetup:
+                AddonRefresh(addon);
+                return;
+
+            case AddonEvent.PreFinalize:
+                RestoreInstructionText(addon);
+                return;
+
+            case AddonEvent.PostRefresh or AddonEvent.PostRequestedUpdate or AddonEvent.PostUpdate:
+                AddonRefresh(addon);
+                return;
+        }
     }
 
     private void AddonRefresh(AddonWeeklyBingo* addon) {
@@ -47,89 +81,141 @@ public unsafe class AddonWeeklyBingoController : AddonController<AddonWeeklyBing
             System.PerfectTails.GameState[index] = PlayerState.Instance()->IsWeeklyBingoStickerPlaced(index);
         }
 
-        var existingTextNode = GetTargetTextNode(addon);
-        if (existingTextNode is null) return;
-
-        var baseText = SeString.Parse(existingTextNode->NodeText).TextValue;
-        if (!string.IsNullOrEmpty(lastInjectedText)) {
-            var injectedIndex = baseText.IndexOf(lastInjectedText, StringComparison.Ordinal);
-            if (injectedIndex >= 0) {
-                baseText = baseText[..injectedIndex];
-            }
-        }
-
-        baseText = baseText.TrimEnd('\r', '\n', ' ');
-        lastInjectedText = System.PerfectTails.SolveAndGetProbabilitySeString().TextValue;
-
-        existingTextNode->SetText(string.IsNullOrEmpty(baseText)
-            ? lastInjectedText
-            : $"{baseText}\r{lastInjectedText}");
+        UpdateInstructionText(addon);
     }
 
-    private void DetachNodes(AddonWeeklyBingo* addon) {
-        var existingTextNode = GetTargetTextNode(addon);
-        if (existingTextNode is not null) {
-            var baseText = SeString.Parse(existingTextNode->NodeText).TextValue;
-            if (!string.IsNullOrEmpty(lastInjectedText)) {
-                var injectedIndex = baseText.IndexOf(lastInjectedText, StringComparison.Ordinal);
-                if (injectedIndex >= 0) {
-                    baseText = baseText[..injectedIndex].TrimEnd('\r', '\n', ' ');
-                    existingTextNode->SetText(baseText);
-                }
-            }
-
-            if (originalTextNodeHeight > 0) {
-                existingTextNode->SetHeight(originalTextNodeHeight);
-            }
-
-            existingTextNode->TextFlags = originalTextFlags;
+    private void UpdateInstructionText(AddonWeeklyBingo* addon) {
+        var instructionNode = GetInstructionTextNode(addon);
+        if (instructionNode is null) {
+            return;
         }
 
-        targetTextNodeId = 0;
-        originalTextNodeHeight = 0;
-        originalTextFlags = 0;
-        lastInjectedText = string.Empty;
+        var currentText = SeString.Parse(instructionNode->NodeText).TextValue;
+        if (string.IsNullOrEmpty(currentText)) {
+            return;
+        }
+
+        var baseText = instructionOriginalText ?? NormalizeInstructionText(currentText);
+        if (!baseText.Contains(InstructionOriginalSegment, StringComparison.Ordinal)) {
+            return;
+        }
+
+        instructionOriginalText = baseText;
+
+        if (instructionOriginalHeight == 0) {
+            instructionOriginalHeight = instructionNode->GetHeight();
+        }
+
+        if (instructionOriginalFlags == 0) {
+            instructionOriginalFlags = (TextFlags)instructionNode->TextFlags;
+        }
+
+        instructionNode->TextFlags |= TextFlags.MultiLine;
+
+        var lineSpacing = instructionNode->LineSpacing > 0 ? instructionNode->LineSpacing : (byte)16;
+        var desiredHeight = (ushort)(instructionOriginalHeight + (lineSpacing * 2));
+        if (instructionNode->GetHeight() < desiredHeight) {
+            instructionNode->SetHeight(desiredHeight);
+        }
+
+        var (probabilityLine, averageLine) = System.PerfectTails.GetInlineDisplayLines();
+        var replacedText = BuildInstructionDisplayText(baseText, probabilityLine, averageLine);
+        if (!string.Equals(replacedText, currentText, StringComparison.Ordinal)) {
+            instructionNode->SetText(replacedText);
+        }
     }
 
-    private AtkTextNode* GetTargetTextNode(AddonWeeklyBingo* addon) {
-        if (targetTextNodeId != 0) {
-            var cachedNode = addon->GetTextNodeById(targetTextNodeId);
-            if (IsCandidateNode(cachedNode)) {
+    private void RestoreInstructionText(AddonWeeklyBingo* addon) {
+        if (instructionTextNodeId == 0 || string.IsNullOrEmpty(instructionOriginalText)) {
+            return;
+        }
+
+        var instructionNode = addon->GetTextNodeById(instructionTextNodeId);
+        if (instructionNode is null) {
+            return;
+        }
+
+        instructionNode->SetText(instructionOriginalText);
+
+        if (instructionOriginalHeight > 0) {
+            instructionNode->SetHeight(instructionOriginalHeight);
+        }
+
+        if (instructionOriginalFlags != 0) {
+            instructionNode->TextFlags = instructionOriginalFlags;
+        }
+    }
+
+    private AtkTextNode* GetInstructionTextNode(AddonWeeklyBingo* addon) {
+        if (instructionTextNodeId != 0) {
+            var cachedNode = addon->GetTextNodeById(instructionTextNodeId);
+            if (IsInstructionNode(cachedNode)) {
                 return cachedNode;
             }
         }
 
-        var textNode = addon->GetTextNodeById(34);
-        if (IsCandidateNode(textNode)) {
-            return textNode;
-        }
-
-        AtkTextNode* bestNode = null;
         foreach (var node in addon->UldManager.Nodes) {
-            if (node.Value is null || node.Value->Type is not NodeType.Text) continue;
+            if (node.Value is null || node.Value->Type is not NodeType.Text) {
+                continue;
+            }
 
             var candidate = (AtkTextNode*)node.Value;
-            if (!IsCandidateNode(candidate)) continue;
-
-            if (bestNode is null
-                || candidate->GetWidth() > bestNode->GetWidth()
-                || (candidate->GetWidth() == bestNode->GetWidth() && candidate->GetYFloat() < bestNode->GetYFloat())) {
-                bestNode = candidate;
+            if (!IsInstructionNode(candidate)) {
+                continue;
             }
+
+            instructionTextNodeId = candidate->AtkResNode.NodeId;
+            return candidate;
         }
 
-        return bestNode;
+        return null;
     }
 
-    private static bool IsCandidateNode(AtkTextNode* node) {
-        if (node is null) return false;
-        if (node->NodeText.AsSpan().Length == 0) return false;
+    private static string NormalizeInstructionText(string text) {
+        var normalized = text.Replace(InstructionReplacementSegment, InstructionOriginalSegment, StringComparison.Ordinal);
+        var lines = normalized
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => !line.StartsWith(ProbabilityPrefix, StringComparison.Ordinal)
+                        && !line.StartsWith(AveragePrefix, StringComparison.Ordinal))
+            .ToArray();
 
-        var text = SeString.Parse(node->NodeText).TextValue.Trim();
-        if (string.IsNullOrEmpty(text)) return false;
-        if (node->GetWidth() < 250 || node->GetHeight() < 20) return false;
+        return string.Join("\r", lines);
+    }
 
-        var y = node->GetYFloat();
-        return y is > 40 and < 220;
+    private static string BuildInstructionDisplayText(string baseText, string probabilityLine, string averageLine) {
+        var lines = new List<string>();
+        var inserted = false;
+
+        foreach (var line in baseText.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)) {
+            if (!inserted && line.Contains(InstructionOriginalSegment, StringComparison.Ordinal)) {
+                lines.Add(line.TrimEnd('\u3002', ' '));
+                lines.Add(string.Empty);
+                lines.Add(probabilityLine);
+                lines.Add(averageLine);
+                inserted = true;
+                continue;
+            }
+
+            lines.Add(line);
+        }
+
+        return string.Join("\r", lines);
+    }
+
+    private static bool IsInstructionNode(AtkTextNode* node) {
+        if (node is null || node->NodeText.AsSpan().Length == 0) {
+            return false;
+        }
+
+        var text = SeString.Parse(node->NodeText).TextValue;
+        return text.Contains(InstructionOriginalSegment, StringComparison.Ordinal)
+               || text.Contains(InstructionReplacementSegment, StringComparison.Ordinal)
+               || text.Contains(ProbabilityPrefix, StringComparison.Ordinal)
+               || text.Contains(AveragePrefix, StringComparison.Ordinal);
+    }
+
+    private static AddonWeeklyBingo* GetOpenAddon() {
+        var address = DalamudServices.GameGui.GetAddonByName(AddonName).Address;
+        return address == nint.Zero ? null : (AddonWeeklyBingo*)address;
     }
 }
